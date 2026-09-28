@@ -1,5 +1,8 @@
-<script setup lang="ts">
-withDefaults(defineProps<{ id?: string; size?: number }>(), { id: 'dots', size: 14 })
+<script setup>
+defineProps({
+  id: { type: String, default: 'dots' },
+  size: { type: Number, default: 14 },
+})
 </script>
 
 <template>

@@ -1,6 +1,7 @@
-<script setup lang="ts">
+<script setup>
 import introImg from '@/assets/images/student-intro.webp'
-import wave from '@/assets/wave.svg'
+import waveTop from '@/assets/wave-top.svg'
+import waveBottom from '@/assets/wave-bottom.svg'
 import DotPattern from '@/components/decor/DotPattern.vue'
 </script>
 
@@ -23,12 +24,14 @@ import DotPattern from '@/components/decor/DotPattern.vue'
       </div>
     </div>
 
-    <!-- Dekorasi gelombang di tepi kanan, menjorok ke section fitur -->
-    <img
-      :src="wave"
-      alt=""
+    <!-- Gelombang kontur = 2 aset yang saling cermin (atas + bawah), ditumpuk tanpa rotasi -->
+    <div
+      class="pointer-events-none absolute right-0 hidden w-[28vw] select-none flex-col md:flex"
+      style="bottom: -19vw"
       aria-hidden="true"
-      class="pointer-events-none absolute -right-8 bottom-[-9rem] hidden w-[24rem] select-none md:block lg:-right-4 lg:w-[30vw] lg:max-w-[34rem]"
-    />
+    >
+      <img :src="waveTop" alt="" class="block w-full" />
+      <img :src="waveBottom" alt="" class="block w-full" />
+    </div>
   </section>
 </template>
