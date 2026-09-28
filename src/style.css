@@ -1,0 +1,12 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Poppins", ui-sans-serif, system-ui, sans-serif;
+  --color-primary: #2864e8;
+  --color-ink: #222222;
+}
+
+/* Netralkan sisa style template Vite (unlayered, menimpa utility Tailwind) */
+:root { color-scheme: light; color: #222222; background-color: #ffffff; }
+html, body { margin: 0; padding: 0; min-width: 320px; display: block; background: #ffffff; font-family: "Poppins", ui-sans-serif, system-ui, sans-serif; overflow-x: hidden; scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
+#app { max-width: none; width: 100%; margin: 0; padding: 0; text-align: left; }

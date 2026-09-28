@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Poppins", ui-sans-serif, system-ui, sans-serif;
+  --color-primary: #2864e8;
+  --color-ink: #222222;
+}
+
+html { scroll-behavior: smooth; }
+body { @apply bg-white font-sans text-ink antialiased; overflow-x: hidden; }
