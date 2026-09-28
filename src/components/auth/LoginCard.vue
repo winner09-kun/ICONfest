@@ -1,13 +1,20 @@
 <script setup>
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuth } from '@/composables/useAuth.js'
 import TextField from '@/components/ui/TextField.vue'
 
 const email = ref('')
 const password = ref('')
 
-// TODO: sambungkan ke backend nanti. Untuk sekarang hanya mencegah submit default.
+const router = useRouter()
+const { login } = useAuth()
+
+// Sementara tanpa backend: anggap login berhasil, simpan user, lalu ke beranda.
+// TODO: ganti dengan panggilan API autentikasi.
 function onSubmit() {
-  /* belum ada logic autentikasi */
+  login({ email: email.value })
+  router.push('/beranda')
 }
 </script>
 
@@ -49,7 +56,7 @@ function onSubmit() {
 
       <p class="text-center text-sm text-[#777777]">
         Belum punya akun?
-        <RouterLink to="/daftar" class="font-semibold text-[#2864E8] hover:underline">Daftar</RouterLink>
+        <a href="#" class="font-semibold text-[#2864E8] hover:underline">Daftar</a>
       </p>
     </form>
   </div>

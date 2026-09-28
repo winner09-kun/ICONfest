@@ -21,7 +21,7 @@ function addClass() {
       </section>
 
       <!-- Kelas -->
-      <section class="rounded-[1.5rem] bg-white p-4 sm:rounded-[2rem] sm:p-7 lg:p-[35px]">
+      <section class="rounded-[1.5rem] bg-white p-3.5 sm:rounded-[2rem] sm:p-7 lg:p-[35px]">
         <div class="mb-4 flex items-center justify-between sm:mb-5">
           <h2 class="text-lg font-normal text-[#777777] sm:text-[22px]">Kelas</h2>
           <button
@@ -33,7 +33,7 @@ function addClass() {
           </button>
         </div>
 
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 lg:gap-[13px]">
+        <div class="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-3 lg:gap-[13px]">
           <ClassCard v-for="c in classes" :key="c.id" :title="c.title" :major="c.major" :lecturer="c.lecturer" />
         </div>
       </section>
