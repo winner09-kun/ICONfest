@@ -1,33 +1,56 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import TextField from '@/components/ui/TextField.vue'
+import SelectField from '@/components/ui/SelectField.vue'
 
 const email = ref('')
+const fullName = ref('')
 const password = ref('')
+const confirmPassword = ref('')
+const role = ref('')
 
-// TODO: sambungkan ke backend nanti. Untuk sekarang hanya mencegah submit default.
+const roles = [
+  { value: 'teacher', label: 'Guru / Dosen' },
+  { value: 'student', label: 'Siswa / Mahasiswa' },
+]
+
+const mismatch = computed(() => confirmPassword.value !== '' && password.value !== confirmPassword.value)
+
+// TODO: sambungkan ke backend nanti. Untuk sekarang hanya validasi dasar di sisi klien.
 function onSubmit() {
-  /* belum ada logic autentikasi */
+  if (mismatch.value) return
+  /* belum ada logic registrasi */
 }
 </script>
 
 <template>
   <div class="w-full rounded-[2rem] border border-[#222222] bg-white p-6 sm:rounded-[2.75rem] sm:p-10">
-    <h2 class="text-xl font-semibold text-[#111111] sm:text-3xl">Masuk ke KeyQuiz</h2>
+    <h2 class="text-xl font-semibold text-[#111111] sm:text-3xl">Daftar ke KeyQuiz</h2>
 
     <form class="mt-6 space-y-4 sm:mt-8 sm:space-y-5" @submit.prevent="onSubmit">
       <TextField id="email" v-model="email" label="Email" type="email" autocomplete="email" />
-      <TextField id="password" v-model="password" label="Kata Sandi" type="password" autocomplete="current-password" />
+      <TextField id="fullName" v-model="fullName" label="Nama Lengkap" autocomplete="name" />
 
-      <div class="text-right">
-        <a href="#" class="text-sm font-semibold text-[#2864E8] hover:underline sm:text-base">Lupa kata sandi</a>
+      <!-- kata sandi & konfirmasi berdampingan (bertumpuk di layar sangat kecil) -->
+      <div class="grid grid-cols-1 gap-4 min-[480px]:grid-cols-2 sm:gap-3">
+        <TextField id="password" v-model="password" label="Kata Sandi" type="password" autocomplete="new-password" />
+        <TextField
+          id="confirmPassword"
+          v-model="confirmPassword"
+          label="Konfirmasi Kata Sandi"
+          type="password"
+          autocomplete="new-password"
+        />
       </div>
+      <p v-if="mismatch" class="-mt-2 text-sm text-red-600" role="alert">Kata sandi dan konfirmasi belum sama.</p>
+
+      <SelectField id="role" v-model="role" label="Pilih Peran" placeholder="Pilih Peran" :options="roles" />
 
       <button
         type="submit"
-        class="h-12 w-full cursor-pointer rounded-lg border border-[#1f52c4] bg-[#2864E8] text-base font-semibold text-white transition hover:bg-[#1f52c4] sm:h-14 sm:text-lg"
+        class="mt-2 h-12 w-full cursor-pointer rounded-lg border border-[#1f52c4] bg-[#2864E8] text-base font-semibold text-white transition hover:bg-[#1f52c4] sm:h-14 sm:text-lg"
       >
-        Masuk
+        Daftar
       </button>
 
       <div class="flex items-center gap-3 text-sm text-[#777777]">
@@ -48,8 +71,8 @@ function onSubmit() {
       </button>
 
       <p class="text-center text-sm text-[#777777]">
-        Belum punya akun?
-        <RouterLink to="/daftar" class="font-semibold text-[#2864E8] hover:underline">Daftar</RouterLink>
+        Sudah punya akun?
+        <RouterLink to="/login" class="font-semibold text-[#2864E8] hover:underline">Masuk</RouterLink>
       </p>
     </form>
   </div>
