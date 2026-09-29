@@ -13,8 +13,8 @@ import HeroBackdrop from '@/components/decor/HeroBackdrop.vue'
 
     <NavBar />
 
-    <div class="mx-auto mt-8 grid max-w-[1280px] items-start gap-10 px-5 sm:px-10 lg:mt-4 lg:grid-cols-[1.5fr_1fr]">
-      <div class="text-white lg:pt-10">
+    <div class="mx-auto mt-10 grid max-w-[1280px] items-start gap-10 px-5 sm:mt-12 sm:px-10 lg:mt-8 lg:grid-cols-[1.5fr_1fr]">
+      <div class="text-white pt-2 sm:pt-4 lg:pt-14">
         <h1 class="text-[7.2vw] font-bold leading-[1.3] sm:text-5xl lg:whitespace-nowrap lg:text-[clamp(2.5rem,4.2vw,3.75rem)]">
           Esai Tepat<br />Nilai Cepat<br />Evaluasi Hemat Waktu
         </h1>

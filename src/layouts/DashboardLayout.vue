@@ -80,7 +80,32 @@ function handleManageGoogle() {
 
     <!-- Konten: latar biru -->
     <main class="bg-[#2864E8] p-3 pb-24 sm:p-5 sm:pb-24 lg:p-[25px] lg:pb-[25px]">
-      <slot />
+      <div class="animate-content-fade">
+        <slot />
+      </div>
     </main>
   </div>
 </template>
+
+<style scoped>
+@keyframes contentFade {
+  from {
+    opacity: 0.6;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-content-fade {
+  animation: contentFade 0.22s ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-content-fade {
+    animation: none !important;
+  }
+}
+</style>
