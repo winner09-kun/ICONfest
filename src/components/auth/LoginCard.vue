@@ -3,9 +3,15 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth.js'
 import TextField from '@/components/ui/TextField.vue'
+import SelectField from '@/components/ui/SelectField.vue'
 
 const email = ref('')
 const password = ref('')
+const role = ref('teacher')
+const roles = [
+  { value: 'teacher', label: 'Guru / Dosen' },
+  { value: 'student', label: 'Siswa / Mahasiswa' },
+]
 
 const router = useRouter()
 const { login } = useAuth()
@@ -13,7 +19,7 @@ const { login } = useAuth()
 // Sementara tanpa backend: anggap login berhasil, simpan user, lalu ke beranda.
 // TODO: ganti dengan panggilan API autentikasi.
 function onSubmit() {
-  login({ email: email.value })
+  login({ email: email.value, role: role.value })
   router.push('/beranda')
 }
 </script>
@@ -33,6 +39,7 @@ function onSubmit() {
         type="password"
         autocomplete="current-password"
       />
+      <SelectField id="login-role" v-model="role" label="Masuk sebagai" :options="roles" />
 
       <div class="text-right">
         <a href="#" class="text-sm font-semibold text-[#2864E8] hover:underline sm:text-base"
@@ -78,7 +85,9 @@ function onSubmit() {
 
       <p class="text-center text-sm text-[#777777]">
         Belum punya akun?
-        <RouterLink to="/daftar" class="font-semibold text-[#2864E8] hover:underline">Daftar</RouterLink>
+        <RouterLink to="/daftar" class="font-semibold text-[#2864E8] hover:underline"
+          >Daftar</RouterLink
+        >
       </p>
     </form>
   </div>

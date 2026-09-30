@@ -16,15 +16,23 @@ function load() {
 const user = ref(load())
 
 function nameFromEmail(email) {
-  const base = email.split('@')[0].replace(/[._-]+/g, ' ').trim()
+  const base = email
+    .split('@')[0]
+    .replace(/[._-]+/g, ' ')
+    .trim()
   return base ? base.replace(/\b\w/g, (c) => c.toUpperCase()) : 'Pengguna'
 }
 
 export function useAuth() {
   const isLoggedIn = computed(() => !!user.value)
 
-  function login({ email, name }) {
-    user.value = { email, name: name || nameFromEmail(email) }
+  function login({ email, name, role }) {
+    const existingRole = user.value?.email === email ? user.value.role : null
+    user.value = {
+      email,
+      name: name || nameFromEmail(email),
+      role: role || existingRole || 'teacher',
+    }
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(user.value))
     } catch {

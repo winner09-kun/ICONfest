@@ -9,7 +9,7 @@ const router = useRouter()
 const currentStep = ref('upload')
 
 const fileInput = ref(null)
-const selectedFile = ref(null)
+const selectedFiles = ref([])
 
 // Scanning animation state
 const scanProgress = ref(0)
@@ -19,28 +19,13 @@ let scanInterval = null
 // Modal simpan
 const isSavedModalOpen = ref(false)
 
-// Data soal hasil scan (frontend mock)
+// Data soal hasil scan (frontend mock sesuai tampilan gambar pengguna)
 const scannedQuestions = ref([
   {
     id: 1,
-    title: 'Soal 1',
-    soal: 'Jelaskan fungsi utama mitokondria di dalam sel eukariotik dan sebutkan zat energi yang dihasilkannya!',
-    jawaban: 'Mitokondria berfungsi sebagai pusat respirasi seluler yang menghasilkan energi kimia dalam bentuk Adenosin Trifosfat (ATP).',
+    soal: 'ICONFEST diselenggarakan dimana?',
+    jawaban: 'di Unsil Tasikmalaya',
     checked: true,
-  },
-  {
-    id: 2,
-    title: 'Soal 2',
-    soal: 'Sebutkan 3 perbedaan utama antara sel tumbuhan dan sel hewan yang dapat diamati secara struktural!',
-    jawaban: '1) Sel tumbuhan memiliki dinding sel kaku, 2) memiliki kloroplas untuk fotosintesis, dan 3) memiliki vakuola sentral yang berukuran besar.',
-    checked: true,
-  },
-  {
-    id: 3,
-    title: 'Soal 3',
-    soal: 'Apa yang dimaksud dengan proses osmosis pada membran semipermeabel sel?',
-    jawaban: 'Osmosis adalah perpindahan molekul pelarut (seperti air) dari larutan berkonsentrasi rendah (hipotonik) menuju larutan berkonsentrasi lebih tinggi (hipertonik) melalui membran semipermeabel.',
-    checked: false,
   },
 ])
 
@@ -49,14 +34,21 @@ function triggerFileInput() {
 }
 
 function onFileChange(event) {
-  const file = event.target.files?.[0]
-  if (file) {
-    selectedFile.value = file
+  const files = Array.from(event.target.files || [])
+  if (files.length > 0) {
+    selectedFiles.value = [...selectedFiles.value, ...files]
   }
 }
 
-function removeFile() {
-  selectedFile.value = null
+function removeFile(index) {
+  selectedFiles.value.splice(index, 1)
+  if (selectedFiles.value.length === 0 && fileInput.value) {
+    fileInput.value.value = ''
+  }
+}
+
+function clearAllFiles() {
+  selectedFiles.value = []
   if (fileInput.value) {
     fileInput.value.value = ''
   }
@@ -72,22 +64,23 @@ function formatFileSize(bytes) {
 
 // Mulai proses scanning dengan animasi loading
 function startScanning() {
-  // Jika belum ada file yang dipilih, gunakan dokumen contoh agar guru bisa langsung coba
-  if (!selectedFile.value) {
-    selectedFile.value = {
-      name: 'Lembar_Ujian_Biologi_X.pdf',
-      size: 245000,
-    }
+  if (selectedFiles.value.length === 0) {
+    selectedFiles.value = [
+      {
+        name: 'Lembar_Soal_ICONFEST_1.png',
+        size: 320000,
+      },
+    ]
   }
 
   currentStep.value = 'scanning'
   scanProgress.value = 0
-  scanStatusText.value = 'Membaca struktur lembar kuis...'
+  scanStatusText.value = 'Membaca dokumen dan foto soal...'
 
   if (scanInterval) clearInterval(scanInterval)
 
   const startTime = Date.now()
-  const duration = 2000 // 2 detik loading animation
+  const duration = 2000
 
   scanInterval = setInterval(() => {
     const elapsed = Date.now() - startTime
@@ -95,11 +88,11 @@ function startScanning() {
     scanProgress.value = progress
 
     if (progress < 35) {
-      scanStatusText.value = 'Membaca struktur lembar dokumen...'
+      scanStatusText.value = 'Membaca teks dari lembar foto...'
     } else if (progress < 75) {
       scanStatusText.value = 'AI mengekstrak butir soal & kunci jawaban...'
     } else {
-      scanStatusText.value = 'Menyiapkan lembar koreksi untuk guru...'
+      scanStatusText.value = 'Menyiapkan hasil koreksi soal...'
     }
 
     if (progress >= 100) {
@@ -143,39 +136,39 @@ function handleSave() {
 function resetScan() {
   currentStep.value = 'upload'
   isSavedModalOpen.value = false
-  removeFile()
+  clearAllFiles()
 }
 
 // Teks dinamis banner atas saat tahap upload
 const bannerTitle = computed(() => {
-  return selectedFile.value
-    ? 'Dokumen Kuis Terdeteksi'
+  return selectedFiles.value.length > 0
+    ? `${selectedFiles.value.length} Dokumen / Foto Terdeteksi`
     : 'Selamat datang di KeyQuiz'
 })
 
 const bannerSubtitle = computed(() => {
-  return selectedFile.value
-    ? 'File Anda siap dipindai dan dievaluasi secara otomatis oleh AI.'
+  return selectedFiles.value.length > 0
+    ? 'File & foto Anda siap dipindai dan dievaluasi secara otomatis oleh AI.'
     : 'Kelola kelas dan kuis kamu di satu tempat.'
 })
 
 // Teks dinamis kartu bawah saat tahap upload
 const cardTitle = computed(() => {
-  return selectedFile.value
-    ? 'File Berhasil Ditambahkan!'
+  return selectedFiles.value.length > 0
+    ? `${selectedFiles.value.length} File Berhasil Ditambahkan!`
     : 'Koreksi Jawaban Menggunakan AI'
 })
 
 const cardSubtitle = computed(() => {
-  return selectedFile.value
-    ? 'Klik tombol di bawah untuk memulai penilaian dan koreksi otomatis.'
-    : 'Mendukung file PDF, Word, PNG, JPG'
+  return selectedFiles.value.length > 0
+    ? 'Anda dapat menambahkan foto lagi atau klik tombol di bawah untuk mulai memindai.'
+    : 'Mendukung multi-upload: JPG, PNG, PDF, Word'
 })
 
 const buttonText = computed(() => {
-  return selectedFile.value
+  return selectedFiles.value.length > 0
     ? 'Mulai Koreksi AI'
-    : 'Tambahkan File Anda'
+    : 'Tambahkan Foto / File Anda'
 })
 </script>
 
@@ -185,10 +178,11 @@ const buttonText = computed(() => {
     <!-- TAHAP 1: UPLOAD DOKUMEN                    -->
     <!-- ========================================== -->
     <div v-if="currentStep === 'upload'" class="space-y-4 sm:space-y-[22px]">
-      <!-- Input file tersembunyi -->
+      <!-- Input file tersembunyi dengan dukungan multiple file -->
       <input
         ref="fileInput"
         type="file"
+        multiple
         class="hidden"
         accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
         @change="onFileChange"
@@ -220,32 +214,36 @@ const buttonText = computed(() => {
           {{ cardSubtitle }}
         </p>
 
-        <!-- Informasi file yang terpilih -->
+        <!-- Informasi file-file yang terpilih (Multi-upload Support) -->
         <div
-          v-if="selectedFile"
-          class="mt-6 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-2.5 text-sm text-[#222222] shadow-sm animate-fade-in"
+          v-if="selectedFiles.length > 0"
+          class="mt-6 flex flex-wrap items-center justify-center gap-2.5 max-w-2xl animate-fade-in"
         >
-          <!-- Ikon Dokumen -->
-          <svg class="size-5 text-[#2864E8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          <span class="max-w-[220px] truncate font-medium sm:max-w-sm">
-            {{ selectedFile.name }}
-          </span>
-          <span class="text-xs text-[#777777]">
-            ({{ formatFileSize(selectedFile.size) }})
-          </span>
-          <!-- Tombol Hapus / Batal -->
-          <button
-            type="button"
-            class="ml-2 cursor-pointer text-slate-400 transition hover:text-red-500"
-            title="Hapus file"
-            @click="removeFile"
+          <div
+            v-for="(f, fIdx) in selectedFiles"
+            :key="fIdx"
+            class="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-xs sm:text-sm text-[#222222] shadow-xs"
           >
-            <svg class="size-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            <!-- Ikon Foto/Dokumen -->
+            <svg class="size-4 text-[#2864E8] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
-          </button>
+            <span class="max-w-[150px] sm:max-w-[200px] truncate font-medium">
+              {{ f.name }}
+            </span>
+            <span class="text-[11px] text-[#777777]">
+              ({{ formatFileSize(f.size) }})
+            </span>
+            <!-- Tombol Hapus Satuan -->
+            <button
+              type="button"
+              class="ml-1 cursor-pointer text-slate-400 transition hover:text-red-500"
+              title="Hapus foto ini"
+              @click="removeFile(fIdx)"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         <!-- Tombol Aksi -->
@@ -253,19 +251,19 @@ const buttonText = computed(() => {
           <button
             type="button"
             class="cursor-pointer rounded-xl bg-[#2864E8] px-8 py-3.5 text-base font-semibold text-white shadow-md transition duration-200 hover:bg-[#1f52c4] hover:shadow-lg active:scale-[0.98] sm:px-10 sm:py-4 sm:text-lg"
-            @click="selectedFile ? startScanning() : triggerFileInput()"
+            @click="selectedFiles.length > 0 ? startScanning() : triggerFileInput()"
           >
             {{ buttonText }}
           </button>
 
-          <!-- Opsi ganti file saat file sudah dipilih -->
+          <!-- Opsi Tambah Foto Lagi saat sudah ada foto yang dipilih -->
           <button
-            v-if="selectedFile"
+            v-if="selectedFiles.length > 0"
             type="button"
             class="cursor-pointer rounded-xl border border-slate-300 bg-white px-5 py-3.5 text-sm font-semibold text-[#555555] transition hover:bg-slate-50 sm:text-base sm:py-4"
             @click="triggerFileInput"
           >
-            Ganti File
+            + Tambah Foto Lain
           </button>
         </div>
       </section>
@@ -281,25 +279,18 @@ const buttonText = computed(() => {
       <div class="relative flex flex-col items-center max-w-md w-full">
         <!-- Visual scanner animasi -->
         <div class="relative mb-8 flex size-28 items-center justify-center sm:size-36">
-          <!-- Glow pulsing background -->
           <div class="absolute inset-0 rounded-3xl bg-[#2864E8]/15 blur-xl animate-pulse"></div>
 
-          <!-- Document icon frame -->
           <div class="relative flex size-24 items-center justify-center rounded-2xl border-2 border-[#2864E8]/30 bg-blue-50/50 shadow-inner sm:size-28 overflow-hidden">
-            <!-- Icon Document -->
             <svg class="size-12 text-[#2864E8] sm:size-14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-
-            <!-- Laser Scanning Beam Animation -->
             <div class="scanner-beam pointer-events-none absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-[#2864E8] to-transparent shadow-[0_0_12px_#2864E8]"></div>
           </div>
 
-          <!-- Circular radar ping -->
           <div class="absolute inset-0 rounded-3xl border border-[#2864E8]/40 animate-ping opacity-40"></div>
         </div>
 
-        <!-- Judul Proses -->
         <h2 class="text-xl font-bold text-[#222222] sm:text-2xl">
           Memindai Soal Kuis
         </h2>
@@ -321,122 +312,64 @@ const buttonText = computed(() => {
           </div>
         </div>
 
-        <!-- Nama Dokumen yang diproses -->
+        <!-- Nama Dokumen / Jumlah Foto yang diproses -->
         <div class="mt-6 flex items-center gap-2 rounded-full bg-slate-100 px-4 py-1.5 text-xs text-[#555555]">
           <span class="size-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span class="truncate max-w-[240px]">{{ selectedFile?.name || 'Dokumen Kuis' }}</span>
+          <span class="truncate max-w-[240px]">
+            {{ selectedFiles.length > 1 ? `${selectedFiles.length} Foto Soal Diproses` : selectedFiles[0]?.name || 'Dokumen Kuis' }}
+          </span>
         </div>
       </div>
     </div>
 
-    <!-- ========================================== -->
-    <!-- TAHAP 3: HASIL SCAN SOAL (Mockup Layout)    -->
-    <!-- ========================================== -->
+    <!-- ============================================================== -->
+    <!-- TAHAP 3: HASIL SCAN SOAL (PERSIS SESUAI FOTO MOCKUP PENGGUNA)   -->
+    <!-- ============================================================== -->
     <div v-else-if="currentStep === 'result'" class="space-y-4 sm:space-y-[22px]">
-      <!-- 1. KOTAK PUTIH ATAS (Sesuai Mockup Gambar) -->
+      <!-- 1. KOTAK PUTIH KOSONG ATAS (Sesuai Mockup Gambar Terbaru Pengguna) -->
       <section
-        class="flex flex-col justify-between rounded-[1.5rem] bg-white p-6 sm:rounded-[2rem] sm:p-8 lg:min-h-[220px] shadow-sm transition-all"
-      >
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <div class="flex items-center gap-2.5">
-              <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-[#2864E8]">
-                <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
-                </svg>
-                Hasil Pindai Selesai
-              </span>
-              <span class="text-xs text-[#777777]">
-                {{ selectedFile?.name || 'Dokumen Kuis' }}
-              </span>
-            </div>
-            <h1 class="mt-2 text-xl font-bold text-[#222222] sm:text-2xl lg:text-3xl">
-              Verifikasi Butir Soal & Kunci Jawaban
-            </h1>
-            <p class="mt-1 text-sm text-[#777777] sm:text-base">
-              Centang butir soal yang sesuai untuk disimpan ke bank kuis. Anda juga dapat meninjau langsung hasil koreksi AI.
-            </p>
-          </div>
+        class="min-h-[140px] rounded-[1.5rem] bg-white p-6 shadow-sm sm:min-h-[180px] sm:rounded-[2rem] sm:p-8 lg:min-h-[220px]"
+      />
 
-          <!-- Tombol Navigasi / Kontrol Atas -->
-          <div class="flex items-center gap-2.5 self-start sm:self-center shrink-0">
-            <button
-              type="button"
-              class="cursor-pointer rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-[#555555] transition hover:bg-slate-50 hover:text-[#2864E8] sm:text-sm"
-              @click="toggleCheckAll"
-            >
-              {{ allChecked ? 'Batal Centang Semua' : 'Centang Semua' }}
-            </button>
-            <button
-              type="button"
-              class="cursor-pointer rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-[#555555] transition hover:bg-slate-50 hover:text-red-500 sm:text-sm"
-              @click="resetScan"
-            >
-              Scan Ulang
-            </button>
-          </div>
-        </div>
-
-        <!-- Status Bar Ringkasan di dalam kotak atas -->
-        <div class="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4 text-xs sm:text-sm text-[#666666]">
-          <div class="flex items-center gap-4">
-            <span>Total Soal: <strong class="text-[#222222]">{{ scannedQuestions.length }}</strong></span>
-            <span>Tercentang: <strong class="text-[#2864E8]">{{ checkedCount }}</strong></span>
-          </div>
-          <span class="text-xs text-[#888888]">Tips: Klik tombol centang di sebelah kanan tiap kartu soal</span>
-        </div>
-      </section>
-
-      <!-- 2. KARTU-KARTU SOAL (Sesuai Mockup Gambar) -->
+      <!-- 2. KARTU SOAL HASIL SCAN (Sesuai Mockup Gambar: Pertanyaan, Garis Tipis, Jawaban, & Kotak Centang Biru) -->
       <div class="space-y-4 sm:space-y-[18px]">
         <div
           v-for="(item, index) in scannedQuestions"
           :key="item.id"
-          class="flex items-center justify-between rounded-[1.5rem] bg-white p-6 shadow-sm transition duration-200 hover:shadow-md sm:rounded-[2rem] sm:p-7"
-          :class="{ 'ring-2 ring-white/60': item.checked }"
+          class="flex items-center justify-between rounded-[1.5rem] bg-white p-6 shadow-sm transition duration-200 hover:shadow-md sm:rounded-[2rem] sm:p-8"
         >
-          <!-- Konten Kiri: Soal, Garis Pembatas, dan Jawaban -->
-          <div class="min-w-0 flex-1 pr-4 sm:pr-8">
-            <!-- Bagian Soal -->
-            <div>
-              <div class="text-lg font-bold text-[#222222] sm:text-xl">
-                {{ item.title }}
-              </div>
-              <p class="mt-1 text-sm text-[#444444] sm:text-base leading-relaxed">
-                {{ item.soal }}
-              </p>
-            </div>
+          <!-- Sisi Kiri: Soal, Garis Pembatas, dan Jawaban -->
+          <div class="min-w-0 flex-1 pr-6 sm:pr-10">
+            <!-- Teks Pertanyaan -->
+            <h2 class="text-lg font-bold text-[#222222] sm:text-xl lg:text-[22px] tracking-tight">
+              {{ item.soal }}
+            </h2>
 
-            <!-- Garis Abu-abu Pembatas (Sesuai Mockup) -->
-            <div class="my-3.5 h-[1px] w-full bg-slate-200"></div>
+            <!-- Garis Abu-abu Pembatas Tipis Sesuai Mockup -->
+            <div class="my-3.5 h-[1.5px] w-full bg-[#d9d9d9]"></div>
 
-            <!-- Bagian Jawaban -->
-            <div>
-              <div class="text-xs font-semibold uppercase tracking-wider text-[#888888]">
-                Jawaban
-              </div>
-              <p class="mt-0.5 text-sm font-medium text-[#2864E8] sm:text-base leading-relaxed">
+            <!-- Teks Jawaban -->
+            <div class="space-y-0.5">
+              <span class="text-xs font-normal text-[#888888] sm:text-sm">
+                Jawaban:
+              </span>
+              <p class="text-sm font-semibold text-[#222222] sm:text-base">
                 {{ item.jawaban }}
               </p>
             </div>
           </div>
 
-          <!-- Konten Kanan: Kotak Centang Rounded (Sesuai Mockup) -->
+          <!-- Sisi Kanan: Kotak Centang Rounded Putih dengan Garis Border Biru & Checkmark Biru Sesuai Mockup -->
           <button
             type="button"
-            class="relative flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-xl transition duration-200 sm:size-12 sm:rounded-2xl active:scale-95"
-            :class="[
-              item.checked
-                ? 'bg-[#2864E8] text-white shadow-md shadow-[#2864E8]/30 ring-2 ring-[#2864E8]/20'
-                : 'bg-[#d8dfea] text-transparent hover:bg-[#cbd5e1]'
-            ]"
-            :aria-label="item.checked ? 'Batalkan centang soal ' + item.title : 'Centang soal ' + item.title"
+            class="flex size-11 sm:size-12 shrink-0 cursor-pointer items-center justify-center rounded-xl border-2 transition duration-200 active:scale-95 bg-white"
+            :class="item.checked ? 'border-[#2864E8] text-[#2864E8]' : 'border-[#d0d0d0] text-transparent hover:border-[#2864E8]'"
+            :aria-label="item.checked ? 'Batalkan centang soal' : 'Centang soal'"
             @click="toggleQuestionCheck(index)"
           >
-            <!-- Ikon Centang (Checkmark) -->
             <svg
-              class="size-6 transition-transform duration-200"
-              :class="item.checked ? 'scale-100' : 'scale-50 opacity-0'"
+              class="size-7 transition-all duration-200"
+              :class="item.checked ? 'scale-100 opacity-100' : 'scale-50 opacity-0'"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -447,11 +380,11 @@ const buttonText = computed(() => {
         </div>
       </div>
 
-      <!-- 3. TOMBOL SIMPAN DI POJOK KANAN BAWAH (Sesuai Mockup Gambar) -->
-      <div class="flex justify-end pt-2 sm:pt-4">
+      <!-- 3. TOMBOL SIMPAN DI POJOK KANAN BAWAH (Sesuai Foto Mockup Gambar) -->
+      <div class="flex justify-end pt-4 sm:pt-6">
         <button
           type="button"
-          class="cursor-pointer rounded-xl border border-white bg-[#2864E8] px-8 py-3 text-base font-semibold text-white shadow-md transition duration-200 hover:bg-[#1f52c4] hover:shadow-lg active:scale-95 sm:px-10 sm:py-3.5 sm:text-lg"
+          class="cursor-pointer rounded-2xl bg-[#2864E8] border border-white/80 px-10 py-3 text-base font-bold text-white shadow-md transition duration-200 hover:bg-[#1f52c4] hover:shadow-lg active:scale-95 sm:px-12 sm:py-3.5 sm:text-lg"
           @click="handleSave"
         >
           Simpan

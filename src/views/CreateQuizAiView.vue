@@ -1,0 +1,328 @@
+<script setup>
+import { ref, computed, nextTick } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import DashboardLayout from '@/layouts/DashboardLayout.vue'
+import aiBannerImg from '@/assets/images/bennerbuatsoal_ai.png'
+import sendFillIcon from '@/assets/icons/Send_fill.svg'
+import { classes as initialClasses } from '@/data/classes.js'
+
+const route = useRoute()
+const router = useRouter()
+
+const classId = computed(() => Number(route.params.id) || 1)
+const currentClass = computed(() => {
+  return initialClasses.find((c) => c.id === classId.value) || initialClasses[0]
+})
+
+const defaultAiResponse = `Berikut contoh soal mengenai ICONFEST yang bisa digunakan untuk pengujian sistem penilaian esai dan pilihan ganda.
+
+Soal Esai
+1. Jelaskan apa yang dimaksud dengan ICONFEST dan apa tujuan utama diselenggarakannya kegiatan tersebut!
+2. Menurut pendapat Anda, bagaimana kegiatan ICONFEST dapat membantu mahasiswa dalam mengembangkan kemampuan di bidang teknologi, kreativitas, dan inovasi?
+
+Soal Pilihan Ganda
+
+3. Salah satu tujuan utama kegiatan seperti ICONFEST adalah untuk mendorong peserta dalam mengembangkan...
+A. Kemampuan bermain olahraga
+B. Kreativitas dan inovasi teknologi
+C. Kemampuan memasak
+D. Kemampuan berbisnis secara konvensional
+
+Jawaban: B
+
+4. Peserta ICONFEST umumnya dapat mengembangkan kemampuan melalui kegiatan yang berkaitan dengan...
+A. Teknologi dan inovasi
+B. Pertanian tradisional saja
+C. Seni bela diri
+D. Olahraga profesional
+
+Jawaban: A
+
+5. Salah satu manfaat mengikuti kegiatan ICONFEST bagi mahasiswa adalah...
+
+A. Mengurangi pengalaman dalam bekerja sama
+B. Membatasi kemampuan dalam membuat proyek
+C. Meningkatkan pengalaman, kreativitas, dan kemampuan berkolaborasi
+D. Menghindari penggunaan teknologi
+
+Jawaban: C`
+
+// State Chat / Perintah
+const inputPrompt = ref('')
+const isSubmitted = ref(false)
+const userMessage = ref('')
+const isAgreed = ref(false)
+const isSuccessModalOpen = ref(false)
+const chatScrollAreaRef = ref(null)
+
+function handleSubmitPrompt() {
+  if (!inputPrompt.value.trim()) return
+
+  userMessage.value = inputPrompt.value.trim()
+  isSubmitted.value = true
+  inputPrompt.value = ''
+
+  nextTick(() => {
+    if (chatScrollAreaRef.value) {
+      chatScrollAreaRef.value.scrollTop = chatScrollAreaRef.value.scrollHeight
+    }
+  })
+}
+
+function handleKeyDown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault()
+    handleSubmitPrompt()
+  }
+}
+
+function handleAgree() {
+  isAgreed.value = true
+  isSuccessModalOpen.value = true
+}
+
+function handleCloseSuccess() {
+  isSuccessModalOpen.value = false
+  router.push(`/kelas/${classId.value}`)
+}
+</script>
+
+<template>
+  <!-- Gunakan :no-scroll="true" agar border/latar biru tetap terkunci dan tidak ikut bergeser -->
+  <DashboardLayout :no-scroll="true">
+    <div class="flex flex-col flex-1 h-full min-h-0">
+      <!-- Breadcrumb Navigasi Kembali: Tetap berada di atas / Statis tidak ikut scroll -->
+      <div class="flex items-center justify-between pb-3 sm:pb-3.5 text-white/90 shrink-0">
+        <button
+          type="button"
+          class="flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-white/90 transition hover:text-white hover:translate-x-[-2px] sm:text-sm"
+          @click="router.push(`/kelas/${classId}`)"
+        >
+          <svg class="size-4 sm:size-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7" />
+          </svg>
+          Kembali ke Kelas
+        </button>
+
+        <span class="text-xs text-white/80 sm:text-sm font-medium truncate max-w-[200px] sm:max-w-md">
+          {{ currentClass.title }}
+        </span>
+      </div>
+
+      <!-- TAMPILAN 1: SEBELUM USER INPUT PERINTAH (Sesuai Foto 1) -->
+      <div v-if="!isSubmitted" class="flex-1 flex flex-col min-h-0 space-y-3 sm:space-y-4 overflow-y-auto pr-0.5">
+        <!-- Banner Manfaatkan AI Untuk Membuat Soal -->
+        <section class="overflow-hidden rounded-[1.5rem] bg-white shadow-sm sm:rounded-[2rem] shrink-0">
+          <img
+            :src="aiBannerImg"
+            alt="Manfaatkan AI Untuk Membuat Soal"
+            class="block h-auto w-full select-none object-cover"
+          />
+        </section>
+
+        <!-- Kotak Putih Tempat Chat / Prompt Awal -->
+        <section
+          class="flex-1 flex flex-col items-center justify-center rounded-[1.5rem] bg-white p-6 shadow-sm sm:rounded-[2rem] sm:p-12 min-h-[300px]"
+        >
+          <div class="w-full max-w-2xl text-center">
+            <!-- Teks Tengah: Ada ide baru untuk hari ini? -->
+            <h1 class="text-2xl font-bold text-[#666666] sm:text-3xl lg:text-4xl tracking-tight">
+              Ada ide baru untuk hari ini?
+            </h1>
+
+            <!-- Input Bar Melengkung Pill -->
+            <div class="mt-8 sm:mt-12 w-full">
+              <div
+                class="flex items-center rounded-full border-2 border-[#2864E8] bg-white px-4 py-2 sm:px-6 sm:py-3 shadow-sm transition-all focus-within:shadow-md"
+              >
+                <!-- Tombol Plus Kiri -->
+                <button
+                  type="button"
+                  class="flex items-center gap-2 cursor-pointer text-[#2864E8] transition hover:opacity-80 shrink-0"
+                  @click="handleSubmitPrompt"
+                  aria-label="Mulai berdiskusi"
+                >
+                  <svg class="size-6 sm:size-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
+                  </svg>
+                </button>
+
+                <!-- Input Text -->
+                <input
+                  v-model="inputPrompt"
+                  type="text"
+                  placeholder="Mulai berdiskusi"
+                  class="w-full bg-transparent px-3 text-sm text-[#444444] placeholder-[#888888] outline-none sm:px-4 sm:text-base lg:text-lg"
+                  @keydown="handleKeyDown"
+                />
+
+                <!-- Tombol Kirim Kanan (Icon Send Fill) -->
+                <button
+                  type="button"
+                  class="cursor-pointer shrink-0 transition hover:scale-105 active:scale-95 text-[#2864E8] p-1"
+                  aria-label="Kirim Perintah"
+                  @click="handleSubmitPrompt"
+                >
+                  <img :src="sendFillIcon" alt="Kirim" class="size-6 sm:size-7" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- TAMPILAN 2: SETELAH USER INPUT PERINTAH (Sesuai Foto 2) -->
+      <!-- Menggunakan layout Flex Col di mana container pesan bisa di-scroll, dan input bar POSISINYA TETAP di bawah -->
+      <div v-else class="flex-1 flex flex-col min-h-0 rounded-[1.5rem] bg-white shadow-sm sm:rounded-[2rem] p-4 sm:p-7 lg:p-9 overflow-hidden">
+        
+        <!-- Area Percakapan Bubble Chat (Scrollable mandiri di dalam kotak putih) -->
+        <div ref="chatScrollAreaRef" class="flex-1 min-h-0 overflow-y-auto pr-1 sm:pr-3 space-y-6">
+          <!-- Balon Chat User (Sisi Kanan Atas dengan Ekor Kanan Bawah Sesuai Foto 2) -->
+          <div class="flex justify-end pt-2">
+            <div class="relative max-w-[85%] sm:max-w-2xl">
+              <!-- Kotak Balon User: Border biru melengkung, sudut kanan bawah menjadi pangkal ekor -->
+              <div
+                class="rounded-[24px] rounded-br-[4px] border-2 border-[#2864E8] bg-white px-5 py-3.5 sm:px-6 sm:py-4 text-sm sm:text-base font-medium text-[#222222] shadow-sm leading-relaxed"
+              >
+                {{ userMessage }}
+              </div>
+              
+              <!-- Ekor SVG Balon Chat User Sesuai Foto 2 (Kanan Bawah) -->
+              <svg
+                class="absolute -bottom-[9px] -right-[1px] w-[18px] h-[12px] pointer-events-none"
+                viewBox="0 0 18 12"
+                fill="none"
+              >
+                <!-- Isi Putih Balon -->
+                <path d="M0 0C6 1 12 5 18 12C14 6 10 2 0 0Z" fill="white" />
+                <!-- Border Garis Biru -->
+                <path d="M0 0C6 1 12 5 18 12" stroke="#2864E8" stroke-width="2" stroke-linecap="round" />
+              </svg>
+            </div>
+          </div>
+
+          <!-- Balon Chat AI (Sisi Kiri dengan Ekor Kiri Bawah Sesuai Foto 2) -->
+          <div class="flex justify-start">
+            <div class="relative max-w-[96%] sm:max-w-3xl w-full">
+              <!-- Kotak Balon AI: Border biru melengkung, sudut kiri bawah menjadi pangkal ekor -->
+              <div
+                class="rounded-[28px] rounded-bl-[4px] border-2 border-[#2864E8] bg-white p-5 sm:p-8 text-xs sm:text-sm lg:text-[15px] font-normal text-[#222222] shadow-sm leading-relaxed whitespace-pre-line"
+              >
+                {{ defaultAiResponse }}
+              </div>
+
+              <!-- Ekor SVG Balon Chat AI Sesuai Foto 2 (Kiri Bawah) -->
+              <svg
+                class="absolute -bottom-[9px] -left-[1px] w-[18px] h-[12px] pointer-events-none"
+                viewBox="0 0 18 12"
+                fill="none"
+              >
+                <!-- Isi Putih Balon -->
+                <path d="M18 0C12 1 6 5 0 12C4 6 8 2 18 0Z" fill="white" />
+                <!-- Border Garis Biru -->
+                <path d="M18 0C12 1 6 5 0 12" stroke="#2864E8" stroke-width="2" stroke-linecap="round" />
+              </svg>
+            </div>
+          </div>
+
+          <!-- Tombol "Setuju" Biru di Bawah Balon Jawaban AI (Sesuai Foto 2) -->
+          <div class="flex justify-end pr-2 sm:pr-4 pt-1 pb-2">
+            <button
+              type="button"
+              class="cursor-pointer rounded-xl bg-[#2864E8] px-8 py-2.5 text-sm font-semibold text-white shadow-md transition duration-200 hover:bg-[#1f50be] hover:shadow-lg active:scale-95 sm:px-10 sm:py-3 sm:text-base"
+              @click="handleAgree"
+            >
+              Setuju
+            </button>
+          </div>
+        </div>
+
+        <!-- Tombol / Bar Ketik Perintah (Posisi Tetap / Pinned di Bagian Bawah Kotak) -->
+        <div class="shrink-0 pt-3 sm:pt-4 border-t border-slate-100 mt-2">
+          <div
+            class="flex items-center rounded-full border-2 border-[#2864E8] bg-white px-4 py-2 sm:px-6 sm:py-3 shadow-sm transition-all focus-within:shadow-md"
+          >
+            <!-- Tombol Plus Kiri -->
+            <button
+              type="button"
+              class="flex items-center gap-2 cursor-pointer text-[#2864E8] transition hover:opacity-80 shrink-0"
+              @click="handleSubmitPrompt"
+              aria-label="Mulai berdiskusi"
+            >
+              <svg class="size-6 sm:size-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
+              </svg>
+            </button>
+
+            <!-- Input Text -->
+            <input
+              v-model="inputPrompt"
+              type="text"
+              placeholder="Mulai berdiskusi"
+              class="w-full bg-transparent px-3 text-sm text-[#444444] placeholder-[#888888] outline-none sm:px-4 sm:text-base lg:text-lg"
+              @keydown="handleKeyDown"
+            />
+
+            <!-- Tombol Kirim Kanan -->
+            <button
+              type="button"
+              class="cursor-pointer shrink-0 transition hover:scale-105 active:scale-95 text-[#2864E8] p-1"
+              aria-label="Kirim Perintah"
+              @click="handleSubmitPrompt"
+            >
+              <img :src="sendFillIcon" alt="Kirim" class="size-6 sm:size-7" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Konfirmasi Soal Berhasil Disimpan -->
+    <Transition name="modal-fade">
+      <div
+        v-if="isSuccessModalOpen"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+        role="dialog"
+        aria-modal="true"
+        @click.self="handleCloseSuccess"
+      >
+        <div class="w-full max-w-md rounded-[28px] bg-white p-6 sm:p-8 text-center shadow-2xl">
+          <div class="mx-auto flex size-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 sm:size-20">
+            <svg class="size-8 sm:size-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+
+          <h3 class="mt-5 text-xl font-bold text-[#222222] sm:text-2xl">
+            Soal Berhasil Disimpan!
+          </h3>
+
+          <p class="mt-2 text-sm text-[#666666] sm:text-base leading-relaxed">
+            Butir soal esai dan pilihan ganda buatan AI telah disetujui dan ditambahkan ke tugas kelas <strong>{{ currentClass.title }}</strong>.
+          </p>
+
+          <div class="mt-7 flex justify-center">
+            <button
+              type="button"
+              class="cursor-pointer rounded-xl bg-[#2864E8] px-8 py-3 text-sm font-semibold text-white shadow-md transition hover:bg-[#1f50be] active:scale-95 sm:text-base"
+              @click="handleCloseSuccess"
+            >
+              Kembali ke Daftar Tugas
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </DashboardLayout>
+</template>
+
+<style scoped>
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0;
+}
+</style>

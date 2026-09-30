@@ -1,17 +1,18 @@
 <script setup>
 import { reactive, watch, onBeforeUnmount } from 'vue'
 import IconClose from '@/components/icons/IconClose.vue'
+import { useAuth } from '@/composables/useAuth.js'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['update:open', 'create'])
+const { user } = useAuth()
 
 const form = reactive({
   title: '',
   major: '',
-  lecturer: '',
 })
 
 function close() {
@@ -23,14 +24,13 @@ function handleSubmit() {
 
   emit('create', {
     title: form.title.trim(),
-    major: form.major.trim() || 'Kelas Umum',
-    lecturer: form.lecturer.trim() || 'Pengajar',
+    major: form.major.trim() || 'Teknik Informatika',
+    lecturer: user.value?.name || 'Fajerin Abdillah, M. Kom.',
   })
 
   // Reset formulir
   form.title = ''
   form.major = ''
-  form.lecturer = ''
 
   close()
 }
@@ -112,21 +112,6 @@ onBeforeUnmount(() => {
                   v-model="form.major"
                   type="text"
                   placeholder="Contoh: Teknik Informatika / Biologi Dasar"
-                  class="h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-[#222222] outline-none transition placeholder:text-slate-400 focus:border-[#2864E8] focus:ring-2 focus:ring-[#2864E8]/20 sm:h-13 sm:text-base"
-                />
-              </div>
-
-              <!-- Field: Nama Pengajar -->
-              <div>
-                <label for="nama-pengajar" class="mb-2 block text-sm font-medium text-[#444444] sm:text-base">
-                  Nama Pengajar
-                </label>
-                <input
-                  id="nama-pengajar"
-                  v-model="form.lecturer"
-                  type="text"
-                  required
-                  placeholder="Masukkan nama pengajar"
                   class="h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-[#222222] outline-none transition placeholder:text-slate-400 focus:border-[#2864E8] focus:ring-2 focus:ring-[#2864E8]/20 sm:h-13 sm:text-base"
                 />
               </div>
