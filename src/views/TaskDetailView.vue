@@ -1,19 +1,30 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useAuth } from '@/composables/useAuth.js'
+import {
+  classes,
+  saveTaskSubmission,
+  updateSubmissionScore,
+  updateTaskSettings,
+} from '@/composables/useClasses.js'
 import DashboardLayout from '@/layouts/DashboardLayout.vue'
+import QuizSheetTabs from '@/components/ui/QuizSheetTabs.vue'
 import StudentAvatar from '@/components/icons/StudentAvatar.vue'
-import { classes as initialClasses } from '@/data/classes.js'
 import { defaultStudents } from '@/data/students.js'
+import aiBannerImg from '@/assets/images/bennerbuatsoal_ai.png'
 
 const route = useRoute()
 const router = useRouter()
+const { user } = useAuth()
 
 const classId = computed(() => Number(route.params.id) || 1)
 const taskId = computed(() => Number(route.params.taskId) || 1)
+const isStudent = computed(() => user.value?.role === 'student')
+const activeSheet = ref('results')
 
 const currentClass = computed(() => {
-  return initialClasses.find((c) => c.id === classId.value) || initialClasses[0]
+  return classes.value.find((c) => c.id === classId.value) || classes.value[0]
 })
 
 const currentTask = computed(() => {
@@ -27,7 +38,125 @@ const currentTask = computed(() => {
   )
 })
 
-const students = defaultStudents
+const questions = computed(() => currentTask.value.questions || [])
+const answers = ref([])
+const gradeDrafts = ref({})
+
+const studentSubmission = computed(() => {
+  const email = user.value?.email?.trim().toLowerCase()
+  if (!email) return null
+
+  return (
+    currentTask.value.submissions?.find(
+      (submission) => submission.email?.trim().toLowerCase() === email,
+    ) || null
+  )
+})
+
+const submissions = computed(() => currentTask.value.submissions || [])
+const resultStudents = computed(() =>
+  submissions.value.length > 0
+    ? submissions.value.map((submission) => ({
+        ...submission,
+        isDemo: false,
+        displayScore: submission.graded ? submission.score : 'Belum',
+      }))
+    : defaultStudents.map((student) => ({
+        ...student,
+        isDemo: true,
+        displayScore: student.score,
+      })),
+)
+const maxScore = computed(() =>
+  questions.value.reduce((total, question) => total + (Number(question.points) || 0), 0),
+)
+const canSubmit = computed(
+  () => questions.value.length > 0 && answers.value.every((answer) => answer.trim()),
+)
+
+watch(
+  questions,
+  (taskQuestions) => {
+    if (!studentSubmission.value) answers.value = taskQuestions.map(() => '')
+  },
+  { immediate: true },
+)
+
+function normalizeAnswer(answer) {
+  return String(answer || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLocaleLowerCase()
+}
+
+function getSubmittedAnswer(question, index) {
+  return (
+    studentSubmission.value?.answers?.find((answer) => answer.questionId === question.id)?.value ??
+    studentSubmission.value?.answers?.[index]?.value ??
+    ''
+  )
+}
+
+function isAnswerCorrect(question, answer) {
+  return (
+    Boolean(question.answerKey?.trim()) &&
+    normalizeAnswer(answer) === normalizeAnswer(question.answerKey)
+  )
+}
+
+function submitAnswers() {
+  if (!canSubmit.value || !user.value?.email) return
+
+  let score = 0
+  let fullyAutoGraded = true
+  const submittedAnswers = questions.value.map((question, index) => {
+    const value = answers.value[index].trim()
+    if (question.answerKey?.trim()) {
+      if (isAnswerCorrect(question, value)) score += Number(question.points) || 0
+    } else {
+      fullyAutoGraded = false
+    }
+
+    return { questionId: question.id, value }
+  })
+
+  saveTaskSubmission(classId.value, taskId.value, {
+    email: user.value.email,
+    name: user.value.name,
+    answers: submittedAnswers,
+    score: fullyAutoGraded ? score : null,
+    maxScore: maxScore.value,
+    graded: fullyAutoGraded,
+    submittedAt: new Date().toISOString(),
+  })
+}
+
+function saveSettings(key, event) {
+  updateTaskSettings(classId.value, taskId.value, { [key]: event.target.checked })
+}
+
+function saveGrade(submission) {
+  const enteredScore = Number(gradeDrafts.value[submission.email])
+  if (!Number.isFinite(enteredScore)) return
+
+  const boundedScore = Math.min(Math.max(enteredScore, 0), submission.maxScore)
+  updateSubmissionScore(classId.value, taskId.value, submission.email, boundedScore)
+  gradeDrafts.value[submission.email] = boundedScore
+}
+
+function openStudentResult(student, isDemo = false) {
+  router.push({
+    name: 'scan-soal',
+    query: {
+      classId: String(classId.value),
+      taskId: String(taskId.value),
+      studentName: student.name || student.email,
+      studentEmail: student.email,
+      studentScore: String(student.score ?? ''),
+      demo: String(isDemo),
+    },
+  })
+}
 </script>
 
 <template>
@@ -41,76 +170,310 @@ const students = defaultStudents
           @click="router.push(`/kelas/${classId}`)"
         >
           <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7" />
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2.5"
+              d="M15 19l-7-7 7-7"
+            />
           </svg>
           Kembali ke Detail Kelas
         </button>
       </div>
 
-      <!-- Banner Kosong / Putih Atas (Sesuai Mockup Gambar Pengguna) -->
-      <section
-        class="min-h-[140px] rounded-[1.5rem] bg-white p-6 shadow-sm sm:min-h-[180px] sm:rounded-[2rem] sm:p-8 lg:min-h-[210px] lg:p-10 flex flex-col justify-end"
-      >
-        <div>
+      <section class="overflow-hidden rounded-[1.5rem] bg-white shadow-sm sm:rounded-[2rem]">
+        <img
+          :src="aiBannerImg"
+          alt="Manfaatkan AI untuk membuat soal"
+          class="block aspect-[4.7/1] w-full object-cover"
+        />
+      </section>
+
+      <section class="rounded-2xl bg-white px-4 py-3 shadow-sm sm:px-5 sm:py-4">
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span
-            class="inline-block rounded-full bg-[#2864E8]/10 px-3 py-1 text-xs font-semibold text-[#2864E8] sm:text-sm"
+            class="inline-flex rounded-full bg-[#2864E8]/10 px-2 py-0.5 text-[10px] font-semibold text-[#2864E8] sm:text-xs"
           >
             {{ currentClass.major || 'Teknik Informatika' }}
           </span>
-          <h1 class="mt-2 text-xl font-bold text-[#222222] sm:text-2xl lg:text-3xl">
-            {{ currentTask.title }} &bull; {{ currentClass.title }}
-          </h1>
-          <p class="mt-1 text-xs font-medium text-[#777777] sm:text-sm">
-            Pengajar: {{ currentClass.lecturer || 'Fajerin Abdillah, M. Kom.' }} &bull; Tanggal: {{ currentTask.date }}
+          <p class="text-[10px] font-medium text-[#777777] sm:text-xs">
+            Pengajar: {{ currentClass.lecturer || 'Fajerin Abdillah, M. Kom.' }} &bull;
+            {{ currentTask.date }}
           </p>
         </div>
+        <h1 class="mt-1.5 text-base font-bold leading-snug text-[#222222] sm:text-lg">
+          {{ currentTask.title }}
+          <span class="font-medium text-[#777777]">&bull; {{ currentClass.title }}</span>
+        </h1>
       </section>
 
-      <!-- Kotak Putih Daftar Mahasiswa (Sesuai Mockup Gambar Pengguna) -->
-      <section class="rounded-[1.5rem] bg-white p-5 shadow-sm sm:rounded-[2rem] sm:p-8 lg:p-10">
-        <!-- Judul Bagian -->
-        <h2 class="text-xl font-bold text-[#666666] sm:text-2xl lg:text-3xl">
-          Mahasiswa
-        </h2>
+      <section
+        v-if="isStudent && questions.length === 0"
+        class="rounded-[1.5rem] bg-white p-6 text-sm text-[#777777] shadow-sm sm:rounded-[2rem] sm:p-8"
+      >
+        Dosen belum menambahkan soal pada tugas ini.
+      </section>
 
-        <!-- Divider Garis Abu-abu Tipis -->
-        <div class="mt-4 mb-6 h-[1.5px] w-full bg-[#d9d9d9] sm:mt-5 sm:mb-8" />
+      <form
+        v-else-if="isStudent && !studentSubmission"
+        class="space-y-4"
+        @submit.prevent="submitAnswers"
+      >
+        <section
+          v-for="(question, index) in questions"
+          :key="question.id"
+          class="rounded-[1.5rem] bg-white p-5 shadow-sm sm:rounded-[2rem] sm:p-8"
+        >
+          <p class="text-xs font-semibold text-[#2864E8]">
+            Soal {{ index + 1 }} · {{ question.points }} poin
+          </p>
+          <h2 class="mt-2 text-base font-semibold text-[#333333] sm:text-lg">
+            {{ question.title }}
+          </h2>
 
-        <!-- Grid Kartu Mahasiswa 2 Kolom -->
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
-          <div
-            v-for="student in students"
-            :key="student.id"
-            class="flex items-center justify-between rounded-[1.25rem] border border-[#d6d6d6] bg-white p-3 shadow-[0_4px_10px_rgba(0,0,0,0.06)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_6px_14px_rgba(0,0,0,0.1)] sm:rounded-[1.5rem] sm:p-3.5"
-          >
-            <!-- Sisi Kiri: Foto Avatar + Nama + Email -->
-            <div class="flex items-center gap-3 sm:gap-4 min-w-0">
-              <!-- Avatar Siswi Berjilbab/Seragam Kuning Frame Merah/Pink -->
-              <div class="relative size-14 shrink-0 overflow-hidden rounded-[14px] shadow-sm sm:size-16">
-                <StudentAvatar />
-              </div>
-
-              <!-- Nama dan Email -->
-              <div class="min-w-0">
-                <h3 class="truncate text-base font-bold text-[#333333] sm:text-lg">
-                  {{ student.name }}
-                </h3>
-                <p class="truncate text-xs font-normal text-[#888888] sm:text-sm">
-                  {{ student.email }}
-                </p>
-              </div>
-            </div>
-
-            <!-- Sisi Kanan: Badge Nilai Biru -->
-            <div
-              class="flex flex-col items-center justify-center rounded-xl bg-[#2864E8] px-4 py-2 text-white shadow-sm sm:px-5 sm:py-2.5 shrink-0 ml-2"
+          <div v-if="question.type === 'multiple_choice'" class="mt-4 space-y-2">
+            <label
+              v-for="(option, optionIndex) in question.options"
+              :key="optionIndex"
+              class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 text-sm text-[#444444] has-[:checked]:border-[#2864E8] has-[:checked]:bg-blue-50"
             >
-              <span class="text-[11px] font-semibold leading-tight sm:text-xs">Nilai</span>
-              <span class="text-sm font-bold leading-tight sm:text-base">{{ student.score }}</span>
-            </div>
+              <input
+                v-model="answers[index]"
+                type="radio"
+                :name="`question-${question.id}`"
+                :value="option"
+                class="mt-0.5 accent-[#2864E8]"
+              />
+              <span>{{ option }}</span>
+            </label>
           </div>
+          <textarea
+            v-else
+            v-model="answers[index]"
+            rows="4"
+            class="mt-4 w-full rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-[#2864E8]"
+            placeholder="Tulis jawaban kamu"
+          />
+        </section>
+
+        <div class="flex justify-end">
+          <button
+            type="submit"
+            :disabled="!canSubmit"
+            class="rounded-xl bg-[#2864E8] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#1f50be] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Kumpulkan Jawaban
+          </button>
         </div>
+      </form>
+
+      <section
+        v-else-if="isStudent"
+        class="space-y-4 rounded-[1.5rem] bg-white p-5 shadow-sm sm:rounded-[2rem] sm:p-8"
+      >
+        <div
+          class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4"
+        >
+          <div>
+            <h2 class="text-lg font-bold text-[#333333]">Jawaban kamu</h2>
+            <p class="mt-1 text-sm text-[#777777]">
+              {{
+                studentSubmission.graded
+                  ? 'Tugas sudah dinilai.'
+                  : 'Tugas terkumpul, menunggu penilaian dosen.'
+              }}
+            </p>
+          </div>
+          <p
+            v-if="currentTask.showScore !== false && studentSubmission.graded"
+            class="text-lg font-bold text-[#2864E8]"
+          >
+            Nilai {{ studentSubmission.score }}/{{ studentSubmission.maxScore }}
+          </p>
+        </div>
+
+        <article
+          v-for="(question, index) in questions"
+          :key="question.id"
+          class="border-b border-slate-100 py-3 last:border-0"
+        >
+          <p class="font-semibold text-[#333333]">{{ question.title }}</p>
+          <p class="mt-2 text-sm text-[#666666]">
+            Jawaban kamu: {{ getSubmittedAnswer(question, index) }}
+          </p>
+          <template v-if="currentTask.showCorrectAnswers && question.answerKey">
+            <p
+              class="mt-2 text-sm font-semibold"
+              :class="
+                isAnswerCorrect(question, getSubmittedAnswer(question, index))
+                  ? 'text-emerald-700'
+                  : 'text-red-600'
+              "
+            >
+              {{
+                isAnswerCorrect(question, getSubmittedAnswer(question, index))
+                  ? 'Benar'
+                  : 'Belum tepat'
+              }}
+            </p>
+            <p class="mt-1 text-sm text-[#666666]">Kunci jawaban: {{ question.answerKey }}</p>
+          </template>
+        </article>
       </section>
+
+      <template v-else>
+        <QuizSheetTabs :active-tab="activeSheet" @select="activeSheet = $event" />
+
+        <div v-if="activeSheet === 'questions'" class="space-y-4 sm:space-y-5">
+          <section
+            v-if="questions.length === 0"
+            class="rounded-[1.5rem] bg-white p-6 text-sm text-[#777777] shadow-sm sm:rounded-[2rem] sm:p-8"
+          >
+            Dosen belum menambahkan soal pada tugas ini.
+          </section>
+
+          <article
+            v-for="(question, index) in questions"
+            :key="question.id"
+            class="space-y-4 rounded-[1.5rem] border border-[#f0f0f0] bg-white p-5 shadow-sm sm:rounded-[2rem] sm:p-8"
+          >
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div class="min-w-0 flex-1">
+                <p class="text-xs font-semibold text-[#2563EB]">
+                  Soal {{ index + 1 }} · {{ question.points }} poin
+                </p>
+                <h3
+                  class="mt-2 border-b border-[#e5e5e5] pb-2 text-base font-semibold text-[#333333] sm:text-lg"
+                >
+                  {{ question.title }}
+                </h3>
+              </div>
+              <span
+                class="inline-flex w-fit shrink-0 items-center rounded-xl border border-[#cccccc] px-4 py-2 text-xs font-semibold text-[#555555] sm:text-sm"
+              >
+                {{
+                  question.type === 'multiple_choice' ? 'Pilihan Ganda' : 'Esai / Jawaban Singkat'
+                }}
+              </span>
+            </div>
+
+            <div v-if="question.type === 'multiple_choice'" class="space-y-3">
+              <div
+                v-for="(option, optionIndex) in question.options"
+                :key="optionIndex"
+                class="flex items-center gap-3 text-sm text-[#444444] sm:text-base"
+              >
+                <span class="size-4 shrink-0 rounded-full border-2 border-[#888888]" />
+                <span>{{ option }}</span>
+              </div>
+            </div>
+            <div v-else class="border-b border-[#cccccc] pb-1 text-sm text-[#888888]">
+              Teks Jawaban
+            </div>
+
+            <p v-if="question.answerKey" class="text-xs font-medium text-[#16834b]">
+              Kunci jawaban: {{ question.answerKey }}
+            </p>
+          </article>
+        </div>
+
+        <template v-else>
+          <section class="rounded-[1.5rem] bg-white p-5 shadow-sm sm:rounded-[2rem] sm:p-8">
+            <h2 class="text-lg font-bold text-[#333333]">Pengaturan hasil siswa</h2>
+            <div class="mt-4 grid gap-3 sm:grid-cols-2">
+              <label class="flex items-start gap-2 text-sm text-[#555555]">
+                <input
+                  type="checkbox"
+                  :checked="currentTask.showScore !== false"
+                  class="mt-0.5 accent-[#2864E8]"
+                  @change="saveSettings('showScore', $event)"
+                />
+                <span>Tampilkan nilai kepada siswa</span>
+              </label>
+              <label class="flex items-start gap-2 text-sm text-[#555555]">
+                <input
+                  type="checkbox"
+                  :checked="currentTask.showCorrectAnswers === true"
+                  class="mt-0.5 accent-[#2864E8]"
+                  @change="saveSettings('showCorrectAnswers', $event)"
+                />
+                <span>Tampilkan kunci dan benar/salah</span>
+              </label>
+            </div>
+          </section>
+
+          <section class="rounded-[1.5rem] bg-white p-5 shadow-sm sm:rounded-[2rem] sm:p-8">
+            <h2 class="text-lg font-bold text-[#333333]">Mahasiswa</h2>
+            <div
+              class="mt-4 grid gap-3 border-t border-[#d6d6d6] pt-4 sm:grid-cols-2 sm:gap-4 lg:gap-x-8"
+            >
+              <article v-for="student in resultStudents" :key="student.email" class="min-w-0">
+                <button
+                  type="button"
+                  class="flex w-full min-w-0 cursor-pointer items-center gap-2 rounded-xl border border-[#c9c9c9] p-1.5 text-left shadow-[0_2px_3px_rgba(0,0,0,0.2)] transition hover:border-[#2864E8] hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2864E8] sm:gap-3 sm:p-2"
+                  @click="openStudentResult(student, student.isDemo)"
+                >
+                  <div class="size-14 shrink-0 overflow-hidden rounded-xl sm:size-16">
+                    <StudentAvatar />
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <h3 class="truncate text-sm font-semibold text-[#777777] sm:text-base">
+                      {{ student.name || student.email }}
+                    </h3>
+                    <p class="truncate text-[11px] text-[#888888] sm:text-xs">
+                      {{ student.email }}
+                    </p>
+                  </div>
+                  <div
+                    class="flex min-w-14 shrink-0 flex-col items-center rounded-lg bg-[#2864E8] px-2 py-1 text-xs font-medium leading-tight text-white shadow-sm sm:min-w-16 sm:py-1.5 sm:text-sm"
+                  >
+                    <span>Nilai</span>
+                    <span>{{ student.displayScore }}</span>
+                  </div>
+                </button>
+
+                <details v-if="!student.isDemo" class="mt-2 text-sm text-[#555555]">
+                  <summary class="cursor-pointer text-xs font-medium text-[#2864E8]">
+                    Jawaban &amp; penilaian
+                  </summary>
+                  <div class="mt-2 space-y-2 rounded-lg bg-white/90 p-2">
+                    <p v-for="(question, index) in questions" :key="question.id">
+                      <span class="font-medium">{{ question.title }}</span
+                      ><br />
+                      {{
+                        student.answers?.find((answer) => answer.questionId === question.id)
+                          ?.value ||
+                        student.answers?.[index]?.value ||
+                        'Tidak ada jawaban'
+                      }}
+                    </p>
+                    <div v-if="!student.graded" class="flex flex-wrap items-end gap-3 pt-2">
+                      <label class="text-xs font-medium text-[#666666]">
+                        Nilai (maks. {{ student.maxScore }})
+                        <input
+                          type="number"
+                          min="0"
+                          :max="student.maxScore"
+                          :value="gradeDrafts[student.email] ?? ''"
+                          class="mt-1 block w-32 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#2864E8]"
+                          @input="gradeDrafts[student.email] = $event.target.value"
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        class="rounded-lg bg-[#2864E8] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1f50be]"
+                        @click="saveGrade(student)"
+                      >
+                        Simpan nilai
+                      </button>
+                    </div>
+                  </div>
+                </details>
+              </article>
+            </div>
+          </section>
+        </template>
+      </template>
     </div>
   </DashboardLayout>
 </template>

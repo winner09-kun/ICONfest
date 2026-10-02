@@ -1,12 +1,21 @@
 <script setup>
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import DashboardLayout from '@/layouts/DashboardLayout.vue'
+import scanBannerImg from '@/assets/images/BennerscanSoal.png'
 
+const route = useRoute()
 const router = useRouter()
 
 // State: 'upload' | 'scanning' | 'result'
-const currentStep = ref('upload')
+const currentStep = ref(route.query.studentEmail ? 'result' : 'upload')
+
+watch(
+  () => route.query.studentEmail,
+  (studentEmail) => {
+    currentStep.value = studentEmail ? 'result' : 'upload'
+  },
+)
 
 const fileInput = ref(null)
 const selectedFiles = ref([])
@@ -25,6 +34,22 @@ const scannedQuestions = ref([
     id: 1,
     soal: 'ICONFEST diselenggarakan dimana?',
     jawaban: 'di Unsil Tasikmalaya',
+    type: 'short_answer',
+    points: 50,
+    checked: true,
+  },
+  {
+    id: 2,
+    soal: 'Manakah yang termasuk kategori lomba dalam ICONFEST 2026?',
+    type: 'multiple_choice',
+    options: [
+      { value: 'A', label: 'A. Software Development' },
+      { value: 'B', label: 'B. Digital Marketing' },
+      { value: 'C', label: 'C. Network Engineering' },
+      { value: 'D', label: 'D. Game Development' },
+    ],
+    selectedOption: 'A',
+    points: 50,
     checked: true,
   },
 ])
@@ -139,19 +164,6 @@ function resetScan() {
   clearAllFiles()
 }
 
-// Teks dinamis banner atas saat tahap upload
-const bannerTitle = computed(() => {
-  return selectedFiles.value.length > 0
-    ? `${selectedFiles.value.length} Dokumen / Foto Terdeteksi`
-    : 'Selamat datang di KeyQuiz'
-})
-
-const bannerSubtitle = computed(() => {
-  return selectedFiles.value.length > 0
-    ? 'File & foto Anda siap dipindai dan dievaluasi secara otomatis oleh AI.'
-    : 'Kelola kelas dan kuis kamu di satu tempat.'
-})
-
 // Teks dinamis kartu bawah saat tahap upload
 const cardTitle = computed(() => {
   return selectedFiles.value.length > 0
@@ -166,9 +178,7 @@ const cardSubtitle = computed(() => {
 })
 
 const buttonText = computed(() => {
-  return selectedFiles.value.length > 0
-    ? 'Mulai Koreksi AI'
-    : 'Tambahkan Foto / File Anda'
+  return selectedFiles.value.length > 0 ? 'Mulai Koreksi AI' : 'Tambahkan Foto / File Anda'
 })
 </script>
 
@@ -188,29 +198,28 @@ const buttonText = computed(() => {
         @change="onFileChange"
       />
 
-      <!-- Bagian Atas: Banner Teks Dinamis -->
-      <section
-        class="flex min-h-[140px] items-center rounded-[1.5rem] bg-white p-6 transition-all duration-300 sm:min-h-[200px] sm:rounded-[2rem] sm:p-10 lg:h-[245px]"
-      >
-        <div class="transition-all duration-300">
-          <h1 class="text-xl font-bold text-[#222222] sm:text-3xl">
-            {{ bannerTitle }}
-          </h1>
-          <p class="mt-1 text-sm text-[#808080] sm:text-base">
-            {{ bannerSubtitle }}
-          </p>
-        </div>
+      <!-- Banner halaman scan soal -->
+      <section class="overflow-hidden rounded-[1.5rem] bg-white shadow-sm sm:rounded-[2rem]">
+        <img
+          :src="scanBannerImg"
+          alt="Koreksi jawaban lebih mudah menggunakan AI"
+          class="block aspect-[4.7/1] w-full object-cover"
+        />
       </section>
 
       <!-- Bagian Bawah: Koreksi Jawaban Menggunakan AI -->
       <section
         class="flex flex-col items-center justify-center rounded-[1.5rem] bg-white px-5 py-12 text-center transition-all duration-300 sm:rounded-[2rem] sm:px-10 sm:py-16 lg:rounded-[2.5rem] lg:py-20"
       >
-        <h2 class="text-xl font-bold text-[#222222] transition-all duration-300 sm:text-3xl lg:text-4xl">
+        <h2
+          class="text-xl font-bold text-[#222222] transition-all duration-300 sm:text-3xl lg:text-4xl"
+        >
           {{ cardTitle }}
         </h2>
 
-        <p class="mt-2 text-sm text-[#555555] transition-all duration-300 sm:mt-3 sm:text-base lg:text-lg">
+        <p
+          class="mt-2 text-sm text-[#555555] transition-all duration-300 sm:mt-3 sm:text-base lg:text-lg"
+        >
           {{ cardSubtitle }}
         </p>
 
@@ -225,15 +234,23 @@ const buttonText = computed(() => {
             class="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-xs sm:text-sm text-[#222222] shadow-xs"
           >
             <!-- Ikon Foto/Dokumen -->
-            <svg class="size-4 text-[#2864E8] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            <svg
+              class="size-4 text-[#2864E8] shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+              />
             </svg>
             <span class="max-w-[150px] sm:max-w-[200px] truncate font-medium">
               {{ f.name }}
             </span>
-            <span class="text-[11px] text-[#777777]">
-              ({{ formatFileSize(f.size) }})
-            </span>
+            <span class="text-[11px] text-[#777777]"> ({{ formatFileSize(f.size) }}) </span>
             <!-- Tombol Hapus Satuan -->
             <button
               type="button"
@@ -281,19 +298,33 @@ const buttonText = computed(() => {
         <div class="relative mb-8 flex size-28 items-center justify-center sm:size-36">
           <div class="absolute inset-0 rounded-3xl bg-[#2864E8]/15 blur-xl animate-pulse"></div>
 
-          <div class="relative flex size-24 items-center justify-center rounded-2xl border-2 border-[#2864E8]/30 bg-blue-50/50 shadow-inner sm:size-28 overflow-hidden">
-            <svg class="size-12 text-[#2864E8] sm:size-14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          <div
+            class="relative flex size-24 items-center justify-center rounded-2xl border-2 border-[#2864E8]/30 bg-blue-50/50 shadow-inner sm:size-28 overflow-hidden"
+          >
+            <svg
+              class="size-12 text-[#2864E8] sm:size-14"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.75"
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
             </svg>
-            <div class="scanner-beam pointer-events-none absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-[#2864E8] to-transparent shadow-[0_0_12px_#2864E8]"></div>
+            <div
+              class="scanner-beam pointer-events-none absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-[#2864E8] to-transparent shadow-[0_0_12px_#2864E8]"
+            ></div>
           </div>
 
-          <div class="absolute inset-0 rounded-3xl border border-[#2864E8]/40 animate-ping opacity-40"></div>
+          <div
+            class="absolute inset-0 rounded-3xl border border-[#2864E8]/40 animate-ping opacity-40"
+          ></div>
         </div>
 
-        <h2 class="text-xl font-bold text-[#222222] sm:text-2xl">
-          Memindai Soal Kuis
-        </h2>
+        <h2 class="text-xl font-bold text-[#222222] sm:text-2xl">Memindai Soal Kuis</h2>
         <p class="mt-2 text-sm text-[#777777] sm:text-base">
           {{ scanStatusText }}
         </p>
@@ -313,10 +344,16 @@ const buttonText = computed(() => {
         </div>
 
         <!-- Nama Dokumen / Jumlah Foto yang diproses -->
-        <div class="mt-6 flex items-center gap-2 rounded-full bg-slate-100 px-4 py-1.5 text-xs text-[#555555]">
+        <div
+          class="mt-6 flex items-center gap-2 rounded-full bg-slate-100 px-4 py-1.5 text-xs text-[#555555]"
+        >
           <span class="size-2 rounded-full bg-emerald-500 animate-pulse"></span>
           <span class="truncate max-w-[240px]">
-            {{ selectedFiles.length > 1 ? `${selectedFiles.length} Foto Soal Diproses` : selectedFiles[0]?.name || 'Dokumen Kuis' }}
+            {{
+              selectedFiles.length > 1
+                ? `${selectedFiles.length} Foto Soal Diproses`
+                : selectedFiles[0]?.name || 'Dokumen Kuis'
+            }}
           </span>
         </div>
       </div>
@@ -326,57 +363,85 @@ const buttonText = computed(() => {
     <!-- TAHAP 3: HASIL SCAN SOAL (PERSIS SESUAI FOTO MOCKUP PENGGUNA)   -->
     <!-- ============================================================== -->
     <div v-else-if="currentStep === 'result'" class="space-y-4 sm:space-y-[22px]">
-      <!-- 1. KOTAK PUTIH KOSONG ATAS (Sesuai Mockup Gambar Terbaru Pengguna) -->
-      <section
-        class="min-h-[140px] rounded-[1.5rem] bg-white p-6 shadow-sm sm:min-h-[180px] sm:rounded-[2rem] sm:p-8 lg:min-h-[220px]"
-      />
+      <!-- Banner hasil koreksi soal -->
+      <section class="overflow-hidden rounded-[1.5rem] bg-white shadow-sm sm:rounded-[2rem]">
+        <img
+          :src="scanBannerImg"
+          alt="Koreksi jawaban lebih mudah menggunakan AI"
+          class="block aspect-[4.7/1] w-full object-cover"
+        />
+      </section>
 
-      <!-- 2. KARTU SOAL HASIL SCAN (Sesuai Mockup Gambar: Pertanyaan, Garis Tipis, Jawaban, & Kotak Centang Biru) -->
+      <!-- Kartu soal hasil scan -->
       <div class="space-y-4 sm:space-y-[18px]">
         <div
           v-for="(item, index) in scannedQuestions"
           :key="item.id"
-          class="flex items-center justify-between rounded-[1.5rem] bg-white p-6 shadow-sm transition duration-200 hover:shadow-md sm:rounded-[2rem] sm:p-8"
+          class="flex items-start justify-between gap-4 rounded-2xl bg-white p-4 shadow-sm transition duration-200 hover:shadow-md sm:p-6"
         >
-          <!-- Sisi Kiri: Soal, Garis Pembatas, dan Jawaban -->
-          <div class="min-w-0 flex-1 pr-6 sm:pr-10">
-            <!-- Teks Pertanyaan -->
-            <h2 class="text-lg font-bold text-[#222222] sm:text-xl lg:text-[22px] tracking-tight">
+          <div class="min-w-0 flex-1">
+            <h2 class="text-base font-semibold text-[#222222] sm:text-lg">
               {{ item.soal }}
             </h2>
+            <div class="my-2 h-px w-full bg-[#d9d9d9]"></div>
 
-            <!-- Garis Abu-abu Pembatas Tipis Sesuai Mockup -->
-            <div class="my-3.5 h-[1.5px] w-full bg-[#d9d9d9]"></div>
-
-            <!-- Teks Jawaban -->
-            <div class="space-y-0.5">
-              <span class="text-xs font-normal text-[#888888] sm:text-sm">
-                Jawaban:
-              </span>
-              <p class="text-sm font-semibold text-[#222222] sm:text-base">
-                {{ item.jawaban }}
-              </p>
+            <div v-if="item.type === 'multiple_choice'" class="space-y-1">
+              <div
+                v-for="option in item.options"
+                :key="option.value"
+                class="flex items-center gap-2.5 text-sm text-[#222222] sm:text-base"
+              >
+                <span
+                  class="flex size-3.5 shrink-0 items-center justify-center rounded-full border"
+                  :class="
+                    item.selectedOption === option.value ? 'border-[#2864E8]' : 'border-[#999999]'
+                  "
+                >
+                  <span
+                    v-if="item.selectedOption === option.value"
+                    class="size-1.5 rounded-full bg-[#2864E8]"
+                  />
+                </span>
+                {{ option.label }}
+              </div>
+            </div>
+            <div v-else class="space-y-0.5">
+              <span class="text-xs text-[#888888] sm:text-sm">Jawaban:</span>
+              <p class="text-sm font-medium text-[#222222] sm:text-base">{{ item.jawaban }}</p>
             </div>
           </div>
 
-          <!-- Sisi Kanan: Kotak Centang Rounded Putih dengan Garis Border Biru & Checkmark Biru Sesuai Mockup -->
-          <button
-            type="button"
-            class="flex size-11 sm:size-12 shrink-0 cursor-pointer items-center justify-center rounded-xl border-2 transition duration-200 active:scale-95 bg-white"
-            :class="item.checked ? 'border-[#2864E8] text-[#2864E8]' : 'border-[#d0d0d0] text-transparent hover:border-[#2864E8]'"
-            :aria-label="item.checked ? 'Batalkan centang soal' : 'Centang soal'"
-            @click="toggleQuestionCheck(index)"
-          >
-            <svg
-              class="size-7 transition-all duration-200"
-              :class="item.checked ? 'scale-100 opacity-100' : 'scale-50 opacity-0'"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
+          <div class="flex shrink-0 flex-col items-end justify-between self-stretch">
+            <button
+              type="button"
+              class="flex size-9 cursor-pointer items-center justify-center rounded-lg border transition duration-200 active:scale-95 sm:size-10"
+              :class="
+                item.checked
+                  ? 'border-[#2864E8] text-[#2864E8]'
+                  : 'border-[#d0d0d0] text-transparent hover:border-[#2864E8]'
+              "
+              :aria-label="item.checked ? 'Batalkan centang soal' : 'Centang soal'"
+              @click="toggleQuestionCheck(index)"
             >
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
-            </svg>
-          </button>
+              <svg
+                class="size-7 transition-all duration-200"
+                :class="item.checked ? 'scale-100 opacity-100' : 'scale-50 opacity-0'"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2.5"
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+            </button>
+            <span class="mt-3 whitespace-nowrap text-[10px] text-[#888888]">
+              {{ item.points }} Poin*
+            </span>
+          </div>
         </div>
       </div>
 
@@ -384,10 +449,10 @@ const buttonText = computed(() => {
       <div class="flex justify-end pt-4 sm:pt-6">
         <button
           type="button"
-          class="cursor-pointer rounded-2xl bg-[#2864E8] border border-white/80 px-10 py-3 text-base font-bold text-white shadow-md transition duration-200 hover:bg-[#1f52c4] hover:shadow-lg active:scale-95 sm:px-12 sm:py-3.5 sm:text-lg"
+          class="cursor-pointer rounded-xl border border-white/80 bg-transparent px-10 py-3 text-base font-semibold text-white transition duration-200 hover:bg-white/10 active:scale-95 sm:px-12 sm:py-3.5 sm:text-lg"
           @click="handleSave"
         >
-          Simpan
+          Kirim
         </button>
       </div>
     </div>
@@ -400,20 +465,29 @@ const buttonText = computed(() => {
       class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs animate-fade-in"
       @click.self="isSavedModalOpen = false"
     >
-      <div class="w-full max-w-md rounded-3xl bg-white p-6 sm:p-8 text-center shadow-2xl animate-scale-up">
+      <div
+        class="w-full max-w-md rounded-3xl bg-white p-6 sm:p-8 text-center shadow-2xl animate-scale-up"
+      >
         <!-- Ikon Sukses -->
-        <div class="mx-auto flex size-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 sm:size-20">
+        <div
+          class="mx-auto flex size-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 sm:size-20"
+        >
           <svg class="size-8 sm:size-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2.5"
+              d="M5 13l4 4L19 7"
+            />
           </svg>
         </div>
 
-        <h3 class="mt-5 text-xl font-bold text-[#222222] sm:text-2xl">
-          Soal Berhasil Disimpan!
-        </h3>
+        <h3 class="mt-5 text-xl font-bold text-[#222222] sm:text-2xl">Soal Berhasil Disimpan!</h3>
 
         <p class="mt-2 text-sm text-[#666666] sm:text-base">
-          Sebanyak <strong class="text-[#2864E8]">{{ checkedCount }}</strong> dari {{ scannedQuestions.length }} butir soal telah berhasil diverifikasi dan disimpan ke bank kuis.
+          Sebanyak <strong class="text-[#2864E8]">{{ checkedCount }}</strong> dari
+          {{ scannedQuestions.length }} butir soal telah berhasil diverifikasi dan disimpan ke bank
+          kuis.
         </p>
 
         <!-- Tombol Aksi Modal -->

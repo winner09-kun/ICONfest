@@ -1,55 +1,41 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useAuth } from '@/composables/useAuth.js'
 import DashboardLayout from '@/layouts/DashboardLayout.vue'
-import { classes } from '@/composables/useClasses.js'
+import { addTaskToClass, classes } from '@/composables/useClasses.js'
+import classDetailBanner from '@/assets/images/BennedetailClass.png'
 
 const route = useRoute()
 const router = useRouter()
+const { user } = useAuth()
 
 const classId = computed(() => Number(route.params.id) || 1)
+const isStudent = computed(() => user.value?.role === 'student')
 
 // Ambil data kelas atau fallback ke kelas pertama
 const currentClass = computed(() => {
   return classes.value.find((c) => c.id === classId.value) || classes.value[0]
 })
 
-const tasks = ref(
-  currentClass.value?.tasks
-    ? [...currentClass.value.tasks]
-    : [
-        {
-          id: 1,
-          title: 'Tugas 1',
-          date: 'Senin, 28 September 2026',
-        },
-        {
-          id: 2,
-          title: 'Tugas 2',
-          date: 'Senin, 28 September 2026',
-        },
-        {
-          id: 3,
-          title: 'Tugas 3',
-          date: 'Senin, 28 September 2026',
-        },
-        {
-          id: 4,
-          title: 'Tugas 4',
-          date: 'Senin, 28 September 2026',
-        },
-        {
-          id: 5,
-          title: 'Tugas 5',
-          date: 'Senin, 28 September 2026',
-        },
-        {
-          id: 6,
-          title: 'Tugas 6 ',
-          date: 'Senin, 28 September 2026',
-        },
-      ],
+const tasks = computed(() => currentClass.value?.tasks || [])
+const activeClassTab = ref('quizzes')
+const submissions = computed(() => tasks.value.flatMap((task) => task.submissions || []))
+const gradedSubmissions = computed(() =>
+  submissions.value.filter(
+    (submission) => submission.graded && Number.isFinite(Number(submission.score)),
+  ),
 )
+const averageScore = computed(() => {
+  if (gradedSubmissions.value.length === 0) return null
+
+  const percentages = gradedSubmissions.value.map((submission) => {
+    const maxScore = Number(submission.maxScore) || 0
+    return maxScore > 0 ? (Number(submission.score) / maxScore) * 100 : 0
+  })
+
+  return Math.round(percentages.reduce((total, score) => total + score, 0) / percentages.length)
+})
 
 // Modal Pilihan Metode Pembuatan Soal (AI vs Manual)
 const isChoiceModalOpen = ref(false)
@@ -90,7 +76,7 @@ function handleAddTask() {
   const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }
   const formattedDate = now.toLocaleDateString('id-ID', options)
 
-  tasks.value.push({
+  addTaskToClass(classId.value, {
     id: Date.now(),
     title: newTaskTitle.value.trim(),
     date: formattedDate,
@@ -103,55 +89,70 @@ function handleAddTask() {
 function handleTaskClick(task) {
   router.push(`/kelas/${classId.value}/tugas/${task.id}`)
 }
+
+function getStudentSubmission(task) {
+  const email = user.value?.email?.trim().toLowerCase()
+  if (!email) return null
+
+  return (
+    task.submissions?.find((submission) => submission.email?.trim().toLowerCase() === email) || null
+  )
+}
 </script>
 
 <template>
   <DashboardLayout>
-    <div class="relative space-y-4 pb-20 sm:space-y-6 sm:pb-24">
-      <!-- Breadcrumb / Tombol Kembali -->
-      <div class="flex items-center gap-2 text-white/90">
+    <div class="relative space-y-4 sm:space-y-6">
+      <!-- Banner Detail Kelas -->
+      <section class="overflow-hidden rounded-[1.5rem] bg-white shadow-sm sm:rounded-[2rem]">
+        <img
+          :src="classDetailBanner"
+          alt="Selamat datang di kelas KeyQuiz"
+          class="block aspect-[4.7/1] w-full object-cover"
+        />
+      </section>
+
+      <div
+        class="grid grid-cols-2 gap-1 rounded-xl border border-white bg-white p-1 shadow-sm"
+        role="tablist"
+        aria-label="Kuis dan statistik kelas"
+      >
         <button
           type="button"
-          class="flex items-center gap-1.5 text-xs font-medium text-white/80 transition hover:text-white sm:text-sm"
-          @click="router.push('/beranda')"
+          role="tab"
+          :aria-selected="activeClassTab === 'quizzes'"
+          class="min-h-11 rounded-lg px-3 py-2 text-base font-semibold transition sm:min-h-12 sm:text-xl"
+          :class="
+            activeClassTab === 'quizzes'
+              ? 'bg-[linear-gradient(90deg,#2563EB_0%,#808080_100%)] text-white shadow-sm'
+              : 'text-[#808080] hover:bg-slate-50'
+          "
+          @click="activeClassTab = 'quizzes'"
         >
-          <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2.5"
-              d="M15 19l-7-7 7-7"
-            />
-          </svg>
-          Kembali ke Kelas
+          Kuis
+        </button>
+        <button
+          type="button"
+          role="tab"
+          :aria-selected="activeClassTab === 'statistics'"
+          class="min-h-11 rounded-lg px-3 py-2 text-base font-semibold transition sm:min-h-12 sm:text-xl"
+          :class="
+            activeClassTab === 'statistics'
+              ? 'bg-[linear-gradient(90deg,#2563EB_0%,#808080_100%)] text-white shadow-sm'
+              : 'text-[#808080] hover:bg-slate-50'
+          "
+          @click="activeClassTab = 'statistics'"
+        >
+          Statistik
         </button>
       </div>
 
-      <!-- Banner Header Putih (Sesuai Gambar Mockup Pengguna) -->
-      <section
-        class="min-h-[170px] rounded-[1.5rem] bg-white p-6 shadow-sm sm:min-h-[220px] sm:rounded-[2rem] sm:p-8 lg:p-10 flex flex-col justify-end"
-      >
-        <div>
-          <span
-            class="inline-block rounded-full bg-[#2864E8]/10 px-3 py-1 text-xs font-semibold text-[#2864E8] sm:text-sm"
-          >
-            {{ currentClass.major || 'Teknik Informatika' }}
-          </span>
-          <h1 class="mt-2 text-xl font-bold text-[#222222] sm:text-2xl lg:text-3xl">
-            {{ currentClass.title || 'Pemrograman Perangkat Bergerak' }}
-          </h1>
-          <p class="mt-1 text-xs font-medium text-[#777777] sm:text-sm">
-            Pengajar: {{ currentClass.lecturer || 'Fajerin Abdillah, M. Kom.' }}
-          </p>
-        </div>
-      </section>
-
-      <!-- Daftar Tugas: Kotak Putih dengan Garis Pemisah Tipis -->
-      <section class="space-y-4 sm:space-y-5">
+      <!-- Daftar Kuis -->
+      <section v-if="activeClassTab === 'quizzes'" class="space-y-4 sm:space-y-5">
         <article
           v-for="task in tasks"
           :key="task.id"
-          class="group cursor-pointer rounded-[1.5rem] border border-[#e3e3e3] bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md sm:rounded-[2rem] sm:p-7"
+          class="group cursor-pointer rounded-2xl border border-[#f0f0f0] bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md sm:p-7"
           @click="handleTaskClick(task)"
         >
           <!-- Judul Tugas -->
@@ -162,17 +163,74 @@ function handleTaskClick(task) {
           </h2>
 
           <!-- Garis Pemisah (Divider) -->
-          <div class="my-3 h-[1px] w-full bg-[#d9d9d9] sm:my-3.5" />
+          <div class="my-3 h-px w-full bg-[#e5e5e5] sm:my-3.5" />
 
           <!-- Tanggal Tugas -->
           <p class="text-xs font-normal text-[#888888] sm:text-sm lg:text-[15px]">
             {{ task.date }}
           </p>
+
+          <div v-if="isStudent" class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span
+              v-if="!getStudentSubmission(task)"
+              class="text-xs font-semibold text-[#777777] sm:text-sm"
+            >
+              Belum dikerjakan
+            </span>
+            <template
+              v-else-if="
+                getStudentSubmission(task).graded || getStudentSubmission(task).score != null
+              "
+            >
+              <span class="text-xs font-semibold text-[#16834b] sm:text-sm">Sudah dikerjakan</span>
+              <span
+                v-if="task.showScore !== false"
+                class="text-xs font-bold text-[#2864E8] sm:text-sm"
+              >
+                Nilai: {{ getStudentSubmission(task).score }}/{{
+                  getStudentSubmission(task).maxScore
+                }}
+              </span>
+            </template>
+            <span v-else class="text-xs font-semibold text-[#b36b00] sm:text-sm">
+              Menunggu nilai
+            </span>
+          </div>
+        </article>
+        <div
+          v-if="tasks.length === 0"
+          class="rounded-2xl bg-white p-6 text-center text-sm text-[#888888] sm:p-8"
+        >
+          Belum ada kuis di kelas ini.
+        </div>
+      </section>
+
+      <section v-else class="grid gap-4 sm:grid-cols-3 sm:gap-5" aria-label="Statistik kelas">
+        <article class="rounded-2xl bg-white p-5 shadow-sm sm:p-7">
+          <p class="text-sm font-medium text-[#888888]">Jumlah kuis</p>
+          <p class="mt-2 text-3xl font-bold text-[#2864E8]">{{ tasks.length }}</p>
+        </article>
+        <article class="rounded-2xl bg-white p-5 shadow-sm sm:p-7">
+          <p class="text-sm font-medium text-[#888888]">Jawaban masuk</p>
+          <p class="mt-2 text-3xl font-bold text-[#2864E8]">{{ submissions.length }}</p>
+        </article>
+        <article class="rounded-2xl bg-white p-5 shadow-sm sm:p-7">
+          <p class="text-sm font-medium text-[#888888]">Rata-rata nilai</p>
+          <p class="mt-2 text-3xl font-bold text-[#2864E8]">
+            {{ averageScore === null ? '-' : `${averageScore}%` }}
+          </p>
+          <p v-if="averageScore === null" class="mt-1 text-xs text-[#888888]">
+            Belum ada jawaban yang dinilai.
+          </p>
         </article>
       </section>
 
       <!-- Floating Action Button (FAB) Tambah Tugas (+) Sesuai Mockup Gambar -->
+    </div>
+
+    <Teleport to="body">
       <button
+        v-if="!isStudent"
         type="button"
         class="fixed bottom-20 right-6 z-30 flex size-14 cursor-pointer items-center justify-center rounded-full bg-white text-[#2864E8] shadow-[0_6px_20px_rgba(0,0,0,0.25)] transition duration-200 hover:scale-105 hover:shadow-[0_8px_25px_rgba(0,0,0,0.3)] active:scale-95 sm:bottom-8 sm:right-10 sm:size-16"
         aria-label="Tambah Tugas"
@@ -187,7 +245,7 @@ function handleTaskClick(task) {
           />
         </svg>
       </button>
-    </div>
+    </Teleport>
 
     <!-- Modal Popup Pilihan: Buat Soal dengan AI atau Manual -->
     <Transition name="modal-fade">

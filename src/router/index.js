@@ -10,6 +10,9 @@ import TaskDetailView from '@/views/TaskDetailView.vue'
 import CreateQuizAiView from '@/views/CreateQuizAiView.vue'
 import CreateQuizManualView from '@/views/CreateQuizManualView.vue'
 import { useLoading } from '@/composables/useLoading.js'
+import { useAuth } from '@/composables/useAuth.js'
+
+const teachersOnly = () => (useAuth().user.value?.role === 'student' ? '/beranda' : true)
 
 const router = createRouter({
   history: createWebHistory(),
@@ -28,12 +31,14 @@ const router = createRouter({
       path: '/kelas/:id/buat-soal-ai',
       name: 'create-quiz-ai',
       component: CreateQuizAiView,
+      beforeEnter: teachersOnly,
       meta: { title: 'Buat Soal dengan AI' },
     },
     {
       path: '/kelas/:id/buat-soal-manual',
       name: 'create-quiz-manual',
       component: CreateQuizManualView,
+      beforeEnter: teachersOnly,
       meta: { title: 'Buat Soal Manual' },
     },
     {
@@ -79,7 +84,10 @@ router.beforeEach((to, from) => {
 
   // 2. Pas pindah ke halaman login / daftar (dari luar auth, misal dari landing atau dashboard)
   if (isAuth(to.path) && !isAuth(from.path)) {
-    triggerLoading(to.path === '/login' ? 'Menyiapkan Halaman Masuk...' : 'Menyiapkan Halaman Daftar...', 600)
+    triggerLoading(
+      to.path === '/login' ? 'Menyiapkan Halaman Masuk...' : 'Menyiapkan Halaman Daftar...',
+      600,
+    )
     return
   }
 
