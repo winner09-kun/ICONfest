@@ -150,13 +150,13 @@ defineProps({
     <div class="flex flex-1 min-h-0 overflow-hidden">
       <!-- Sidebar (desktop) / bottom nav (mobile) - Terkunci & tidak ikut scroll -->
       <aside
-        class="hidden lg:block w-[240px] shrink-0 border-r border-[#ededed] bg-white overflow-y-auto"
+        class="hidden w-[156px] shrink-0 overflow-y-auto border-r border-[#ededed] bg-white md:block lg:w-[200px] xl:w-[240px]"
       >
         <SidebarNav />
       </aside>
 
       <!-- Bottom Nav untuk Mobile/Tablet -->
-      <div class="lg:hidden">
+      <div class="md:hidden">
         <SidebarNav />
       </div>
 

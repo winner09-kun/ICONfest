@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import DashboardLayout from '@/layouts/DashboardLayout.vue'
+import DeadlineModal from '@/components/ui/DeadlineModal.vue'
 import QuizSheetTabs from '@/components/ui/QuizSheetTabs.vue'
 import aiBannerImg from '@/assets/images/bennerbuatsoal_ai.png'
 import { addTaskToClass, classes } from '@/composables/useClasses.js'
@@ -104,19 +105,28 @@ function closeAnswerKey() {
 
 // Simpan Formulir ke Daftar Tugas Kelas
 const isSavedModalOpen = ref(false)
+const isDeadlineModalOpen = ref(false)
 
 function handleSaveForm() {
-  const now = new Date()
+  isDeadlineModalOpen.value = true
+}
+
+function saveForm(deadline) {
+  const deadlineDate = new Date(`${deadline.date}T12:00:00`)
   addTaskToClass(classId.value, {
     id: Date.now(),
     title: formTitle.value.trim() || 'Tugas tanpa judul',
     description: formDesc.value.trim(),
-    date: now.toLocaleDateString('id-ID', {
+    date: deadlineDate.toLocaleDateString('id-ID', {
       weekday: 'long',
       day: 'numeric',
       month: 'long',
       year: 'numeric',
     }),
+    deadlineDate: deadline.date,
+    deadlineTime: deadline.time,
+    deadlineTimezone: 'WITA',
+    dueAt: `${deadline.date}T${deadline.time}:00+08:00`,
     questions: questions.value.map(({ id, title, type, options, answerKey, points }) => ({
       id,
       title,
@@ -128,6 +138,7 @@ function handleSaveForm() {
     showScore: showScore.value,
     showCorrectAnswers: showCorrectAnswers.value,
   })
+  isDeadlineModalOpen.value = false
   isSavedModalOpen.value = true
 }
 
@@ -163,7 +174,7 @@ function handleCloseSaved() {
           <button
             v-if="activeSheet === 'questions'"
             type="button"
-            class="cursor-pointer rounded-xl bg-white px-4 py-1.5 text-xs sm:text-sm font-bold text-[#2864E8] shadow-sm transition hover:bg-white/90 active:scale-95"
+            class="motion-control cursor-pointer rounded-xl bg-white px-4 py-1.5 text-xs sm:text-sm font-bold text-[#2864E8] shadow-sm transition hover:bg-white/90 active:scale-95"
             @click="handleSaveForm"
           >
             Simpan Formulir
@@ -175,7 +186,7 @@ function handleCloseSaved() {
       <div class="relative flex-1 min-h-0 overflow-y-auto pr-1 space-y-4 pb-20 sm:space-y-5">
         <!-- Banner Manfaatkan AI Untuk Membuat Soal (Sesuai Foto Mockup) -->
         <section
-          class="overflow-hidden rounded-[1.5rem] bg-white shadow-sm sm:rounded-[2rem] shrink-0"
+          class="overflow-hidden rounded-[1.5rem] border-4 border-white bg-white shadow-sm sm:rounded-[2rem] shrink-0"
         >
           <img
             :src="aiBannerImg"
@@ -224,143 +235,146 @@ function handleCloseSaved() {
           </section>
 
           <!-- KARTU DAFTAR PERTANYAAN (Mirip Google Form) -->
-          <section
-            v-for="(q, qIndex) in questions"
-            :key="q.id"
-            class="group relative rounded-[1.5rem] bg-white p-6 shadow-sm sm:rounded-[2rem] sm:p-8 lg:p-9 border border-[#e3e3e3] space-y-6 transition hover:shadow-md"
-          >
-            <!-- Baris Atas: Input Pertanyaan (Kiri) + Dropdown Tipe (Kanan) -->
-            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <!-- Input Judul Pertanyaan -->
-              <div class="flex-1">
-                <input
-                  v-model="q.title"
-                  type="text"
-                  placeholder="Pertanyaan Tanpa Judul"
-                  class="w-full border-b border-[#cccccc] pb-1.5 text-base sm:text-lg lg:text-xl font-bold text-[#444444] outline-none transition focus:border-[#2864E8]"
-                />
+          <TransitionGroup tag="div" name="question-card" appear class="space-y-4">
+            <section
+              v-for="(q, qIndex) in questions"
+              :key="q.id"
+              class="motion-surface group relative rounded-[1.5rem] bg-white p-6 shadow-sm sm:rounded-[2rem] sm:p-8 lg:p-9 border border-[#e3e3e3] space-y-6 transition hover:shadow-md"
+              :style="{ transitionDelay: `${Math.min(qIndex, 4) * 70}ms` }"
+            >
+              <!-- Baris Atas: Input Pertanyaan (Kiri) + Dropdown Tipe (Kanan) -->
+              <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <!-- Input Judul Pertanyaan -->
+                <div class="flex-1">
+                  <input
+                    v-model="q.title"
+                    type="text"
+                    placeholder="Pertanyaan Tanpa Judul"
+                    class="w-full border-b border-[#cccccc] pb-1.5 text-base sm:text-lg lg:text-xl font-bold text-[#444444] outline-none transition focus:border-[#2864E8]"
+                  />
+                </div>
+
+                <!-- Dropdown Tipe Soal (Pilihan Ganda / Esai) -->
+                <div class="w-full sm:w-[220px] shrink-0">
+                  <div class="relative">
+                    <select
+                      v-model="q.type"
+                      class="w-full appearance-none rounded-xl border border-[#cccccc] bg-white px-4 py-2.5 pr-9 text-xs sm:text-sm font-semibold text-[#444444] outline-none transition focus:border-[#2864E8] cursor-pointer"
+                    >
+                      <option v-for="t in questionTypes" :key="t.value" :value="t.value">
+                        {{ t.label }}
+                      </option>
+                    </select>
+                    <!-- Ikon Dropdown -->
+                    <div
+                      class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500"
+                    >
+                      <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <!-- Dropdown Tipe Soal (Pilihan Ganda / Esai) -->
-              <div class="w-full sm:w-[220px] shrink-0">
-                <div class="relative">
-                  <select
-                    v-model="q.type"
-                    class="w-full appearance-none rounded-xl border border-[#cccccc] bg-white px-4 py-2.5 pr-9 text-xs sm:text-sm font-semibold text-[#444444] outline-none transition focus:border-[#2864E8] cursor-pointer"
+              <!-- Baris Tengah: Pilihan Opsi / Teks Jawaban (Kiri) + Tombol Kunci Jawaban (Kanan) -->
+              <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-6">
+                <!-- SISI KIRI: Jawaban Sesuai Tipe -->
+                <div class="flex-1 space-y-3">
+                  <!-- Tipe 1: Pilihan Ganda -->
+                  <div v-if="q.type === 'multiple_choice'" class="space-y-3">
+                    <!-- Item-item Opsi -->
+                    <div
+                      v-for="(opt, optIndex) in q.options"
+                      :key="optIndex"
+                      class="flex items-center gap-3"
+                    >
+                      <!-- Radio Icon Lingkaran -->
+                      <div class="size-4 rounded-full border-2 border-[#888888] shrink-0"></div>
+
+                      <input
+                        v-model="q.options[optIndex]"
+                        type="text"
+                        class="flex-1 text-sm sm:text-base font-normal text-[#444444] outline-none border-b border-transparent focus:border-slate-300 pb-0.5"
+                      />
+
+                      <!-- Tombol Hapus Opsi jika lebih dari 1 -->
+                      <button
+                        v-if="q.options.length > 1"
+                        type="button"
+                        class="text-slate-400 hover:text-red-500 text-xs p-1"
+                        @click="removeOption(q, optIndex)"
+                        title="Hapus opsi"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    <!-- Baris Tambahkan Opsi -->
+                    <div class="flex items-center gap-3 pt-1">
+                      <div class="size-4 rounded-full border-2 border-[#888888] shrink-0"></div>
+                      <button
+                        type="button"
+                        class="cursor-pointer text-sm font-normal text-[#888888] transition hover:text-[#2864E8]"
+                        @click="addOption(q)"
+                      >
+                        Tambahkan Opsi
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Tipe 2: Esai / Teks Jawaban -->
+                  <div v-else class="pt-2">
+                    <input
+                      type="text"
+                      placeholder="Teks Jawaban"
+                      disabled
+                      class="w-full border-b border-[#cccccc] pb-1 text-sm sm:text-base text-[#888888] bg-transparent cursor-not-allowed outline-none"
+                    />
+                  </div>
+                </div>
+
+                <!-- SISI KANAN: Tombol Kotak Kunci Jawaban (Sesuai Foto Mockup) -->
+                <div class="w-full sm:w-[220px] shrink-0 flex flex-col gap-2">
+                  <button
+                    type="button"
+                    class="w-full rounded-xl border border-[#cccccc] bg-white py-2.5 text-center text-xs sm:text-sm font-semibold text-[#444444] shadow-xs transition hover:border-[#2864E8] hover:text-[#2864E8] hover:bg-blue-50/30 active:scale-95 cursor-pointer"
+                    @click="openAnswerKey(q)"
                   >
-                    <option v-for="t in questionTypes" :key="t.value" :value="t.value">
-                      {{ t.label }}
-                    </option>
-                  </select>
-                  <!-- Ikon Dropdown -->
-                  <div
-                    class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500"
+                    Kunci Jawaban
+                  </button>
+
+                  <!-- Indikator Kunci Jawaban yang sudah diatur -->
+                  <div v-if="q.answerKey" class="text-[11px] text-emerald-600 font-medium px-1">
+                    ✓ Kunci: <span class="font-bold">{{ q.answerKey }}</span> ({{ q.points }} Poin)
+                  </div>
+
+                  <!-- Tombol Hapus Pertanyaan di Bawah jika pertanyaan > 1 -->
+                  <button
+                    v-if="questions.length > 1"
+                    type="button"
+                    class="self-end text-xs text-slate-400 hover:text-red-500 mt-1 flex items-center gap-1 cursor-pointer"
+                    @click="removeQuestion(qIndex)"
                   >
-                    <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path
                         stroke-linecap="round"
                         stroke-linejoin="round"
                         stroke-width="2"
-                        d="M19 9l-7 7-7-7"
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                       />
                     </svg>
-                  </div>
+                    Hapus Soal
+                  </button>
                 </div>
               </div>
-            </div>
-
-            <!-- Baris Tengah: Pilihan Opsi / Teks Jawaban (Kiri) + Tombol Kunci Jawaban (Kanan) -->
-            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-6">
-              <!-- SISI KIRI: Jawaban Sesuai Tipe -->
-              <div class="flex-1 space-y-3">
-                <!-- Tipe 1: Pilihan Ganda -->
-                <div v-if="q.type === 'multiple_choice'" class="space-y-3">
-                  <!-- Item-item Opsi -->
-                  <div
-                    v-for="(opt, optIndex) in q.options"
-                    :key="optIndex"
-                    class="flex items-center gap-3"
-                  >
-                    <!-- Radio Icon Lingkaran -->
-                    <div class="size-4 rounded-full border-2 border-[#888888] shrink-0"></div>
-
-                    <input
-                      v-model="q.options[optIndex]"
-                      type="text"
-                      class="flex-1 text-sm sm:text-base font-normal text-[#444444] outline-none border-b border-transparent focus:border-slate-300 pb-0.5"
-                    />
-
-                    <!-- Tombol Hapus Opsi jika lebih dari 1 -->
-                    <button
-                      v-if="q.options.length > 1"
-                      type="button"
-                      class="text-slate-400 hover:text-red-500 text-xs p-1"
-                      @click="removeOption(q, optIndex)"
-                      title="Hapus opsi"
-                    >
-                      ✕
-                    </button>
-                  </div>
-
-                  <!-- Baris Tambahkan Opsi -->
-                  <div class="flex items-center gap-3 pt-1">
-                    <div class="size-4 rounded-full border-2 border-[#888888] shrink-0"></div>
-                    <button
-                      type="button"
-                      class="cursor-pointer text-sm font-normal text-[#888888] transition hover:text-[#2864E8]"
-                      @click="addOption(q)"
-                    >
-                      Tambahkan Opsi
-                    </button>
-                  </div>
-                </div>
-
-                <!-- Tipe 2: Esai / Teks Jawaban -->
-                <div v-else class="pt-2">
-                  <input
-                    type="text"
-                    placeholder="Teks Jawaban"
-                    disabled
-                    class="w-full border-b border-[#cccccc] pb-1 text-sm sm:text-base text-[#888888] bg-transparent cursor-not-allowed outline-none"
-                  />
-                </div>
-              </div>
-
-              <!-- SISI KANAN: Tombol Kotak Kunci Jawaban (Sesuai Foto Mockup) -->
-              <div class="w-full sm:w-[220px] shrink-0 flex flex-col gap-2">
-                <button
-                  type="button"
-                  class="w-full rounded-xl border border-[#cccccc] bg-white py-2.5 text-center text-xs sm:text-sm font-semibold text-[#444444] shadow-xs transition hover:border-[#2864E8] hover:text-[#2864E8] hover:bg-blue-50/30 active:scale-95 cursor-pointer"
-                  @click="openAnswerKey(q)"
-                >
-                  Kunci Jawaban
-                </button>
-
-                <!-- Indikator Kunci Jawaban yang sudah diatur -->
-                <div v-if="q.answerKey" class="text-[11px] text-emerald-600 font-medium px-1">
-                  ✓ Kunci: <span class="font-bold">{{ q.answerKey }}</span> ({{ q.points }} Poin)
-                </div>
-
-                <!-- Tombol Hapus Pertanyaan di Bawah jika pertanyaan > 1 -->
-                <button
-                  v-if="questions.length > 1"
-                  type="button"
-                  class="self-end text-xs text-slate-400 hover:text-red-500 mt-1 flex items-center gap-1 cursor-pointer"
-                  @click="removeQuestion(qIndex)"
-                >
-                  <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                    />
-                  </svg>
-                  Hapus Soal
-                </button>
-              </div>
-            </div>
-          </section>
+            </section>
+          </TransitionGroup>
         </template>
 
         <section
@@ -399,7 +413,7 @@ function handleCloseSaved() {
       <button
         v-if="activeSheet === 'questions'"
         type="button"
-        class="fixed bottom-6 right-6 z-30 flex size-12 sm:size-14 cursor-pointer items-center justify-center rounded-full bg-white text-[#444444] border-2 border-[#b5b5b5] shadow-[0_4px_16px_rgba(0,0,0,0.18)] transition duration-200 hover:scale-105 hover:border-[#2864E8] hover:text-[#2864E8] active:scale-95 sm:bottom-8 sm:right-10"
+        class="motion-control fixed bottom-6 right-6 z-30 flex size-12 sm:size-14 cursor-pointer items-center justify-center rounded-full bg-white text-[#444444] border-2 border-[#b5b5b5] shadow-[0_4px_16px_rgba(0,0,0,0.18)] transition duration-200 hover:scale-105 hover:border-[#2864E8] hover:text-[#2864E8] active:scale-95 sm:bottom-8 sm:right-10"
         aria-label="Tambah Pertanyaan"
         @click="addQuestion"
       >
@@ -499,6 +513,12 @@ function handleCloseSaved() {
       </div>
     </Transition>
 
+    <DeadlineModal
+      :open="isDeadlineModalOpen"
+      @close="isDeadlineModalOpen = false"
+      @save="saveForm"
+    />
+
     <!-- Modal Sukses Simpan Formulir -->
     <Transition name="modal-fade">
       <div
@@ -553,5 +573,32 @@ function handleCloseSaved() {
 .modal-fade-enter-from,
 .modal-fade-leave-to {
   opacity: 0;
+}
+
+.question-card-enter-active,
+.question-card-leave-active,
+.question-card-move {
+  transition:
+    opacity 0.38s ease,
+    transform 0.38s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.question-card-enter-from,
+.question-card-leave-to {
+  opacity: 0;
+  transform: translateY(18px) scale(0.985);
+}
+
+.question-card-leave-active {
+  position: absolute;
+  width: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .question-card-enter-active,
+  .question-card-leave-active,
+  .question-card-move {
+    transition: none;
+  }
 }
 </style>

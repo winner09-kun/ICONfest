@@ -14,8 +14,8 @@ const router = useRouter()
 const { login } = useAuth()
 
 const roles = [
-  { value: 'teacher', label: 'Guru / Dosen' },
-  { value: 'student', label: 'Siswa / Mahasiswa' },
+  { value: 'teacher', label: 'Dosen' },
+  { value: 'student', label: 'Mahasiswa' },
 ]
 
 const mismatch = computed(
@@ -71,7 +71,7 @@ function onSubmit() {
 
       <button
         type="submit"
-        class="mt-2 h-12 w-full cursor-pointer rounded-lg border border-[#1f52c4] bg-[#2864E8] text-base font-semibold text-white transition hover:bg-[#1f52c4] sm:h-14 sm:text-lg"
+        class="motion-control mt-2 h-12 w-full cursor-pointer rounded-lg border border-[#1f52c4] bg-[#2864E8] text-base font-semibold text-white transition hover:bg-[#1f52c4] sm:h-14 sm:text-lg"
       >
         Daftar
       </button>
@@ -82,7 +82,7 @@ function onSubmit() {
 
       <button
         type="button"
-        class="flex h-12 w-full cursor-pointer items-center justify-center gap-3 rounded-lg border border-[#8a8a8a] bg-white text-base font-semibold text-[#111111] transition hover:bg-gray-50 sm:h-14 sm:text-lg"
+        class="motion-control flex h-12 w-full cursor-pointer items-center justify-center gap-3 rounded-lg border border-[#8a8a8a] bg-white text-base font-semibold text-[#111111] transition hover:bg-gray-50 sm:h-14 sm:text-lg"
       >
         <svg width="26" height="26" viewBox="0 0 48 48" aria-hidden="true">
           <path

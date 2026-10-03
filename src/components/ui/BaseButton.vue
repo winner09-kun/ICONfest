@@ -13,7 +13,7 @@ defineProps({
     :is="to ? RouterLink : 'button'"
     :to="to"
     :type="to ? undefined : 'button'"
-    class="inline-flex cursor-pointer items-center justify-center gap-3 rounded-full px-6 py-3 font-semibold text-white no-underline transition hover:scale-[1.03] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+    class="motion-control inline-flex cursor-pointer items-center justify-center gap-3 rounded-full px-6 py-3 font-semibold text-white no-underline transition hover:scale-[1.03] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
     :class="variant === 'solid' ? 'bg-[#2864E8] hover:bg-[#1f52c4]' : 'border border-white bg-transparent uppercase hover:bg-white/10'"
   >
     <slot />

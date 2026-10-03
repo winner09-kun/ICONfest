@@ -12,7 +12,7 @@ import DashboardLayout from '@/layouts/DashboardLayout.vue'
 import QuizSheetTabs from '@/components/ui/QuizSheetTabs.vue'
 import StudentAvatar from '@/components/icons/StudentAvatar.vue'
 import { defaultStudents } from '@/data/students.js'
-import aiBannerImg from '@/assets/images/bennerbuatsoal_ai.png'
+import taskBannerImg from '@/assets/images/BennerMengerjakan.png'
 
 const route = useRoute()
 const router = useRouter()
@@ -41,6 +41,7 @@ const currentTask = computed(() => {
 const questions = computed(() => currentTask.value.questions || [])
 const answers = ref([])
 const gradeDrafts = ref({})
+const isSubmissionSuccessOpen = ref(false)
 
 const studentSubmission = computed(() => {
   const email = user.value?.email?.trim().toLowerCase()
@@ -71,7 +72,11 @@ const maxScore = computed(() =>
   questions.value.reduce((total, question) => total + (Number(question.points) || 0), 0),
 )
 const canSubmit = computed(
-  () => questions.value.length > 0 && answers.value.every((answer) => answer.trim()),
+  () =>
+    questions.value.length > 0 &&
+    Boolean(user.value?.email) &&
+    answers.value.length === questions.value.length &&
+    answers.value.every((answer) => answer.trim()),
 )
 
 watch(
@@ -120,7 +125,7 @@ function submitAnswers() {
     return { questionId: question.id, value }
   })
 
-  saveTaskSubmission(classId.value, taskId.value, {
+  const savedTask = saveTaskSubmission(currentClass.value.id, currentTask.value.id, {
     email: user.value.email,
     name: user.value.name,
     answers: submittedAnswers,
@@ -129,6 +134,8 @@ function submitAnswers() {
     graded: fullyAutoGraded,
     submittedAt: new Date().toISOString(),
   })
+
+  if (savedTask) isSubmissionSuccessOpen.value = true
 }
 
 function saveSettings(key, event) {
@@ -163,7 +170,7 @@ function openStudentResult(student, isDemo = false) {
   <DashboardLayout>
     <div class="space-y-4 pb-16 sm:space-y-6 sm:pb-20">
       <!-- Breadcrumb Navigasi Kembali -->
-      <div class="flex items-center gap-2 text-white/90">
+      <div v-if="!isStudent" class="flex items-center gap-2 text-white/90">
         <button
           type="button"
           class="flex items-center gap-1.5 text-xs font-medium text-white/80 transition hover:text-white sm:text-sm"
@@ -181,30 +188,43 @@ function openStudentResult(student, isDemo = false) {
         </button>
       </div>
 
-      <section class="overflow-hidden rounded-[1.5rem] bg-white shadow-sm sm:rounded-[2rem]">
+      <section
+        class="overflow-hidden rounded-[1.5rem] border-4 border-white bg-white shadow-sm sm:rounded-[2rem]"
+      >
         <img
-          :src="aiBannerImg"
-          alt="Manfaatkan AI untuk membuat soal"
+          :src="taskBannerImg"
+          alt="Mengerjakan soal"
           class="block aspect-[4.7/1] w-full object-cover"
         />
       </section>
 
       <section class="rounded-2xl bg-white px-4 py-3 shadow-sm sm:px-5 sm:py-4">
-        <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span
-            class="inline-flex rounded-full bg-[#2864E8]/10 px-2 py-0.5 text-[10px] font-semibold text-[#2864E8] sm:text-xs"
-          >
-            {{ currentClass.major || 'Teknik Informatika' }}
-          </span>
-          <p class="text-[10px] font-medium text-[#777777] sm:text-xs">
-            Pengajar: {{ currentClass.lecturer || 'Fajerin Abdillah, M. Kom.' }} &bull;
-            {{ currentTask.date }}
+        <template v-if="isStudent">
+          <h1 class="text-lg font-bold leading-snug text-[#222222] sm:text-xl">
+            {{ currentTask.title }}
+          </h1>
+          <div class="my-1.5 h-px w-full bg-[#bdbdbd]"></div>
+          <p class="text-sm text-[#888888] sm:text-base">
+            {{ currentTask.description || `Pertanyaan seputar ${currentTask.title}` }}
           </p>
-        </div>
-        <h1 class="mt-1.5 text-base font-bold leading-snug text-[#222222] sm:text-lg">
-          {{ currentTask.title }}
-          <span class="font-medium text-[#777777]">&bull; {{ currentClass.title }}</span>
-        </h1>
+        </template>
+        <template v-else>
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span
+              class="inline-flex rounded-full bg-[#2864E8]/10 px-2 py-0.5 text-[10px] font-semibold text-[#2864E8] sm:text-xs"
+            >
+              {{ currentClass.major || 'Teknik Informatika' }}
+            </span>
+            <p class="text-[10px] font-medium text-[#777777] sm:text-xs">
+              Pengajar: {{ currentClass.lecturer || 'Fajerin Abdillah, M. Kom.' }} &bull;
+              {{ currentTask.date }}
+            </p>
+          </div>
+          <h1 class="mt-1.5 text-base font-bold leading-snug text-[#222222] sm:text-lg">
+            {{ currentTask.title }}
+            <span class="font-medium text-[#777777]">&bull; {{ currentClass.title }}</span>
+          </h1>
+        </template>
       </section>
 
       <section
@@ -222,47 +242,51 @@ function openStudentResult(student, isDemo = false) {
         <section
           v-for="(question, index) in questions"
           :key="question.id"
-          class="rounded-[1.5rem] bg-white p-5 shadow-sm sm:rounded-[2rem] sm:p-8"
+          class="motion-surface flex flex-col rounded-[1.5rem] bg-white p-5 shadow-sm sm:rounded-[2rem] sm:p-8"
         >
-          <p class="text-xs font-semibold text-[#2864E8]">
-            Soal {{ index + 1 }} · {{ question.points }} poin
-          </p>
-          <h2 class="mt-2 text-base font-semibold text-[#333333] sm:text-lg">
+          <h2 class="text-base font-medium leading-snug text-[#222222] sm:text-lg">
             {{ question.title }}
           </h2>
+          <div class="my-2 h-px w-full bg-[#bdbdbd]"></div>
 
-          <div v-if="question.type === 'multiple_choice'" class="mt-4 space-y-2">
+          <div v-if="question.type === 'multiple_choice'" class="space-y-1">
             <label
               v-for="(option, optionIndex) in question.options"
               :key="optionIndex"
-              class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 text-sm text-[#444444] has-[:checked]:border-[#2864E8] has-[:checked]:bg-blue-50"
+              class="flex cursor-pointer items-center gap-2.5 py-0.5 text-sm text-[#222222] transition-colors sm:text-base"
             >
               <input
                 v-model="answers[index]"
                 type="radio"
                 :name="`question-${question.id}`"
                 :value="option"
-                class="mt-0.5 accent-[#2864E8]"
+                class="size-3.5 shrink-0 accent-[#2864E8]"
               />
               <span>{{ option }}</span>
             </label>
           </div>
-          <textarea
-            v-else
-            v-model="answers[index]"
-            rows="4"
-            class="mt-4 w-full rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-[#2864E8]"
-            placeholder="Tulis jawaban kamu"
-          />
+          <div v-else class="space-y-0.5">
+            <label :for="`answer-${question.id}`" class="text-xs text-[#888888] sm:text-sm">
+              Jawaban:
+            </label>
+            <textarea
+              :id="`answer-${question.id}`"
+              v-model="answers[index]"
+              rows="1"
+              class="w-full resize-y border-b border-transparent bg-transparent py-0 text-sm font-medium text-[#222222] outline-none focus:border-[#2864E8] sm:text-base"
+              placeholder="Tulis jawaban kamu"
+            />
+          </div>
+          <p class="mt-2 self-end text-[10px] text-[#888888]">{{ question.points }} Poin*</p>
         </section>
 
         <div class="flex justify-end">
           <button
             type="submit"
             :disabled="!canSubmit"
-            class="rounded-xl bg-[#2864E8] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#1f50be] disabled:cursor-not-allowed disabled:opacity-50"
+            class="motion-control rounded-xl border border-white/80 bg-transparent px-10 py-3 text-base font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50 sm:px-12 sm:py-3.5 sm:text-lg"
           >
-            Kumpulkan Jawaban
+            Kirim
           </button>
         </div>
       </form>
@@ -321,7 +345,61 @@ function openStudentResult(student, isDemo = false) {
         </article>
       </section>
 
-      <template v-else>
+      <Teleport to="body">
+        <Transition name="submission-success">
+          <div
+            v-if="isSubmissionSuccessOpen"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm"
+            @click.self="isSubmissionSuccessOpen = false"
+          >
+            <section
+              class="submission-success-card w-full max-w-md rounded-3xl bg-white px-6 py-8 text-center shadow-2xl sm:px-9 sm:py-10"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="submission-success-title"
+              aria-describedby="submission-success-description"
+            >
+              <div
+                class="success-check mx-auto flex size-[76px] items-center justify-center rounded-full bg-emerald-100 text-emerald-600 sm:size-20"
+                aria-hidden="true"
+              >
+                <svg class="size-10 sm:size-11" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2.5"
+                    d="m5 12 4 4L19 6"
+                  />
+                </svg>
+              </div>
+              <p
+                class="mt-5 inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700"
+              >
+                Kuis berhasil dikirim
+              </p>
+              <h2
+                id="submission-success-title"
+                class="mt-3 text-xl font-bold text-[#222222] sm:text-2xl"
+              >
+                Kamu sudah mengerjakan kuis ini!
+              </h2>
+              <p id="submission-success-description" class="mt-2 text-sm text-[#666666] sm:text-base">
+                Jawabanmu sudah tersimpan. Terima kasih sudah menyelesaikan
+                <strong>{{ currentTask.title }}</strong>.
+              </p>
+              <button
+                type="button"
+                class="motion-control mt-7 w-full rounded-xl bg-[#2864E8] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#1f50be] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2864E8] sm:text-base"
+                @click="isSubmissionSuccessOpen = false"
+              >
+                Lihat jawaban saya
+              </button>
+            </section>
+          </div>
+        </Transition>
+      </Teleport>
+
+      <template v-if="!isStudent">
         <QuizSheetTabs :active-tab="activeSheet" @select="activeSheet = $event" />
 
         <div v-if="activeSheet === 'questions'" class="space-y-4 sm:space-y-5">
@@ -477,3 +555,54 @@ function openStudentResult(student, isDemo = false) {
     </div>
   </DashboardLayout>
 </template>
+
+<style scoped>
+.submission-success-enter-active,
+.submission-success-leave-active {
+  transition: opacity 180ms ease;
+}
+
+.submission-success-enter-active .submission-success-card,
+.submission-success-leave-active .submission-success-card {
+  transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.submission-success-enter-from,
+.submission-success-leave-to {
+  opacity: 0;
+}
+
+.submission-success-enter-from .submission-success-card,
+.submission-success-leave-to .submission-success-card {
+  transform: translateY(14px) scale(0.96);
+}
+
+.submission-success-enter-active .success-check {
+  animation: success-pop 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes success-pop {
+  0% {
+    transform: scale(0.65);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .submission-success-enter-active,
+  .submission-success-leave-active,
+  .submission-success-enter-active .submission-success-card,
+  .submission-success-leave-active .submission-success-card,
+  .submission-success-enter-active .success-check {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+</style>

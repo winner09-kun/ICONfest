@@ -2,6 +2,7 @@
 import { ref, computed, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import DashboardLayout from '@/layouts/DashboardLayout.vue'
+import DeadlineModal from '@/components/ui/DeadlineModal.vue'
 import aiBannerImg from '@/assets/images/bennerbuatsoal_ai.png'
 import sendFillIcon from '@/assets/icons/Send_fill.svg'
 import { addTaskToClass, classes } from '@/composables/useClasses.js'
@@ -52,6 +53,7 @@ const inputPrompt = ref('')
 const isSubmitted = ref(false)
 const userMessage = ref('')
 const isAgreed = ref(false)
+const isDeadlineModalOpen = ref(false)
 const isSuccessModalOpen = ref(false)
 const chatScrollAreaRef = ref(null)
 const fileInput = ref(null)
@@ -147,22 +149,31 @@ function handleKeyDown(e) {
 }
 
 function handleAgree() {
-  const now = new Date()
+  isAgreed.value = true
+  isDeadlineModalOpen.value = true
+}
+
+function saveAiTask(deadline) {
+  const deadlineDate = new Date(`${deadline.date}T12:00:00`)
   addTaskToClass(classId.value, {
     id: Date.now(),
     title: userMessage.value || 'Kuis AI',
     description: 'Soal dibuat dengan AI.',
-    date: now.toLocaleDateString('id-ID', {
+    date: deadlineDate.toLocaleDateString('id-ID', {
       weekday: 'long',
       day: 'numeric',
       month: 'long',
       year: 'numeric',
     }),
+    deadlineDate: deadline.date,
+    deadlineTime: deadline.time,
+    deadlineTimezone: 'WITA',
+    dueAt: `${deadline.date}T${deadline.time}:00+08:00`,
     questions: parseGeneratedQuestions(defaultAiResponse),
     showScore: showScore.value,
     showCorrectAnswers: showCorrectAnswers.value,
   })
-  isAgreed.value = true
+  isDeadlineModalOpen.value = false
   isSuccessModalOpen.value = true
 }
 
@@ -216,7 +227,7 @@ function handleCloseSuccess() {
       >
         <!-- Banner Manfaatkan AI Untuk Membuat Soal -->
         <section
-          class="overflow-hidden rounded-[1.5rem] bg-white shadow-sm sm:rounded-[2rem] shrink-0"
+          class="overflow-hidden rounded-[1.5rem] border-4 border-white bg-white shadow-sm sm:rounded-[2rem] shrink-0"
         >
           <img
             :src="aiBannerImg"
@@ -293,7 +304,7 @@ function handleCloseSuccess() {
                 <!-- Tombol Kirim Kanan (Icon Send Fill) -->
                 <button
                   type="button"
-                  class="cursor-pointer shrink-0 transition hover:scale-105 active:scale-95 text-[#2864E8] p-1"
+                  class="motion-control cursor-pointer shrink-0 transition hover:scale-105 active:scale-95 text-[#2864E8] p-1"
                   aria-label="Kirim Perintah"
                   @click="handleSubmitPrompt"
                 >
@@ -383,7 +394,7 @@ function handleCloseSuccess() {
               <div class="mt-3 flex justify-end">
                 <button
                   type="button"
-                  class="cursor-pointer rounded-xl bg-[#2864E8] px-8 py-2.5 text-sm font-semibold text-white shadow-md transition duration-200 hover:bg-[#1f50be] hover:shadow-lg active:scale-95 sm:px-10 sm:py-3 sm:text-base"
+                  class="motion-control cursor-pointer rounded-xl bg-[#2864E8] px-8 py-2.5 text-sm font-semibold text-white shadow-md transition duration-200 hover:bg-[#1f50be] hover:shadow-lg active:scale-95 sm:px-10 sm:py-3 sm:text-base"
                   @click="handleAgree"
                 >
                   Setuju
@@ -456,6 +467,12 @@ function handleCloseSuccess() {
         </div>
       </div>
     </div>
+
+    <DeadlineModal
+      :open="isDeadlineModalOpen"
+      @close="isDeadlineModalOpen = false"
+      @save="saveAiTask"
+    />
 
     <!-- Modal Konfirmasi Soal Berhasil Disimpan -->
     <Transition name="modal-fade">

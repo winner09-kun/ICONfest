@@ -3,6 +3,8 @@ import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth.js'
 import DashboardLayout from '@/layouts/DashboardLayout.vue'
+import StudentAvatar from '@/components/icons/StudentAvatar.vue'
+import { defaultStudents } from '@/data/students.js'
 import { addTaskToClass, classes } from '@/composables/useClasses.js'
 import classDetailBanner from '@/assets/images/BennedetailClass.png'
 
@@ -20,22 +22,104 @@ const currentClass = computed(() => {
 
 const tasks = computed(() => currentClass.value?.tasks || [])
 const activeClassTab = ref('quizzes')
-const submissions = computed(() => tasks.value.flatMap((task) => task.submissions || []))
-const gradedSubmissions = computed(() =>
-  submissions.value.filter(
-    (submission) => submission.graded && Number.isFinite(Number(submission.score)),
-  ),
-)
-const averageScore = computed(() => {
-  if (gradedSubmissions.value.length === 0) return null
+const selectedStatisticStudent = ref(null)
+const classStatisticsStudents = computed(() => {
+  return defaultStudents.map((student) => {
+    const quizScores = tasks.value.map((task) => ({
+      id: task.id,
+      title: task.title,
+      score: 100,
+    }))
+    const completedScores = quizScores
+      .filter((quiz) => quiz.score !== null && quiz.score !== undefined)
+      .map((quiz) => Number(quiz.score))
 
-  const percentages = gradedSubmissions.value.map((submission) => {
-    const maxScore = Number(submission.maxScore) || 0
-    return maxScore > 0 ? (Number(submission.score) / maxScore) * 100 : 0
+    return {
+      ...student,
+      completedQuizCount: completedScores.length,
+      average:
+        completedScores.length > 0
+          ? Math.round(
+              completedScores.reduce((total, score) => total + score, 0) / completedScores.length,
+            )
+          : null,
+      quizScores,
+    }
   })
-
-  return Math.round(percentages.reduce((total, score) => total + score, 0) / percentages.length)
 })
+const currentStudentStatistics = computed(() => {
+  const email = user.value?.email?.trim().toLowerCase()
+  const sampleStudent = defaultStudents.find((student) => student.email.toLowerCase() === email)
+  const submissions = tasks.value.map((task) =>
+    task.submissions?.find((submission) => submission.email?.trim().toLowerCase() === email),
+  )
+  const hasSubmissions = submissions.some(Boolean)
+  const quizScores = tasks.value.map((task, index) => {
+    const submission = submissions[index]
+    if (!hasSubmissions) return { id: task.id, title: task.title, score: 100, completed: true }
+    if (!submission) return { id: task.id, title: task.title, score: null, completed: false }
+
+    const rawScore = submission.graded || submission.score != null ? Number(submission.score) : null
+    const maxScore =
+      Number(submission.maxScore) ||
+      (task.questions || []).reduce((total, question) => total + (Number(question.points) || 0), 0)
+
+    return {
+      id: task.id,
+      title: task.title,
+      score:
+        rawScore === null
+          ? null
+          : maxScore > 0
+            ? Math.round((rawScore / maxScore) * 100)
+            : rawScore,
+      completed: true,
+    }
+  })
+  const gradedScores = quizScores
+    .filter((quiz) => Number.isFinite(quiz.score))
+    .map((quiz) => quiz.score)
+
+  return {
+    name: user.value?.name || sampleStudent?.name || 'Mahasiswa',
+    email: user.value?.email || sampleStudent?.email || '',
+    completedQuizCount: quizScores.filter((quiz) => quiz.completed).length,
+    average:
+      gradedScores.length > 0
+        ? Math.round(gradedScores.reduce((total, score) => total + score, 0) / gradedScores.length)
+        : hasSubmissions
+          ? null
+          : 100,
+    quizScores,
+  }
+})
+const visibleStatisticStudent = computed(() =>
+  isStudent.value ? currentStudentStatistics.value : selectedStatisticStudent.value,
+)
+const statisticChartWidth = computed(() => `${Math.max(520, tasks.value.length * 150)}px`)
+
+function getScoreHeight(score) {
+  return `${Math.min(100, Math.max(0, Number(score) || 0))}%`
+}
+
+function formatTaskDeadline(task) {
+  const rawDate = task.deadlineDate || task.dueAt?.slice(0, 10)
+  if (!rawDate) {
+    return task.date?.replace('September', 'Sep').replace('Oktober', 'Okt') || 'Belum ditentukan'
+  }
+
+  return new Date(`${rawDate}T12:00:00`).toLocaleDateString('id-ID', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+function selectClassTab(tab) {
+  activeClassTab.value = tab
+  if (tab === 'quizzes') selectedStatisticStudent.value = null
+}
 
 // Modal Pilihan Metode Pembuatan Soal (AI vs Manual)
 const isChoiceModalOpen = ref(false)
@@ -104,7 +188,9 @@ function getStudentSubmission(task) {
   <DashboardLayout>
     <div class="relative space-y-4 sm:space-y-6">
       <!-- Banner Detail Kelas -->
-      <section class="overflow-hidden rounded-[1.5rem] bg-white shadow-sm sm:rounded-[2rem]">
+      <section
+        class="overflow-hidden rounded-[1.5rem] border-4 border-white bg-white shadow-sm sm:rounded-[2rem]"
+      >
         <img
           :src="classDetailBanner"
           alt="Selamat datang di kelas KeyQuiz"
@@ -127,7 +213,7 @@ function getStudentSubmission(task) {
               ? 'bg-[linear-gradient(90deg,#2563EB_0%,#808080_100%)] text-white shadow-sm'
               : 'text-[#808080] hover:bg-slate-50'
           "
-          @click="activeClassTab = 'quizzes'"
+          @click="selectClassTab('quizzes')"
         >
           Kuis
         </button>
@@ -141,98 +227,226 @@ function getStudentSubmission(task) {
               ? 'bg-[linear-gradient(90deg,#2563EB_0%,#808080_100%)] text-white shadow-sm'
               : 'text-[#808080] hover:bg-slate-50'
           "
-          @click="activeClassTab = 'statistics'"
+          @click="selectClassTab('statistics')"
         >
           Statistik
         </button>
       </div>
 
-      <!-- Daftar Kuis -->
-      <section v-if="activeClassTab === 'quizzes'" class="space-y-4 sm:space-y-5">
-        <article
-          v-for="task in tasks"
-          :key="task.id"
-          class="group cursor-pointer rounded-2xl border border-[#f0f0f0] bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md sm:p-7"
-          @click="handleTaskClick(task)"
+      <Transition name="tab-content" mode="out-in">
+        <!-- Daftar Kuis -->
+        <TransitionGroup
+          v-if="activeClassTab === 'quizzes'"
+          key="quiz-list"
+          tag="section"
+          name="quiz-card"
+          appear
+          class="space-y-4 sm:space-y-5"
         >
-          <!-- Judul Tugas -->
-          <h2
-            class="text-lg font-bold text-[#777777] transition group-hover:text-[#2864E8] sm:text-xl lg:text-2xl"
+          <article
+            v-for="(task, index) in tasks"
+            :key="task.id"
+            class="motion-surface group cursor-pointer rounded-2xl border border-[#f0f0f0] bg-white px-5 py-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md sm:px-6 sm:py-5"
+            :style="{ transitionDelay: `${Math.min(index, 5) * 55}ms` }"
+            @click="handleTaskClick(task)"
           >
-            {{ task.title }}
-          </h2>
-
-          <!-- Garis Pemisah (Divider) -->
-          <div class="my-3 h-px w-full bg-[#e5e5e5] sm:my-3.5" />
-
-          <!-- Tanggal Tugas -->
-          <p class="text-xs font-normal text-[#888888] sm:text-sm lg:text-[15px]">
-            {{ task.date }}
-          </p>
-
-          <div v-if="isStudent" class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span
-              v-if="!getStudentSubmission(task)"
-              class="text-xs font-semibold text-[#777777] sm:text-sm"
-            >
-              Belum dikerjakan
-            </span>
-            <template
-              v-else-if="
-                getStudentSubmission(task).graded || getStudentSubmission(task).score != null
-              "
-            >
-              <span class="text-xs font-semibold text-[#16834b] sm:text-sm">Sudah dikerjakan</span>
-              <span
-                v-if="task.showScore !== false"
-                class="text-xs font-bold text-[#2864E8] sm:text-sm"
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h2
+                class="text-lg font-bold text-[#222222] transition group-hover:text-[#2864E8] sm:text-xl"
               >
-                Nilai: {{ getStudentSubmission(task).score }}/{{
-                  getStudentSubmission(task).maxScore
-                }}
-              </span>
-            </template>
-            <span v-else class="text-xs font-semibold text-[#b36b00] sm:text-sm">
-              Menunggu nilai
-            </span>
-          </div>
-        </article>
-        <div
-          v-if="tasks.length === 0"
-          class="rounded-2xl bg-white p-6 text-center text-sm text-[#888888] sm:p-8"
-        >
-          Belum ada kuis di kelas ini.
-        </div>
-      </section>
+                {{ task.title }}
+              </h2>
+              <p class="text-xs font-medium text-[#888888] sm:text-sm">
+                Tenggat: {{ formatTaskDeadline(task) }}
+              </p>
+            </div>
 
-      <section v-else class="grid gap-4 sm:grid-cols-3 sm:gap-5" aria-label="Statistik kelas">
-        <article class="rounded-2xl bg-white p-5 shadow-sm sm:p-7">
-          <p class="text-sm font-medium text-[#888888]">Jumlah kuis</p>
-          <p class="mt-2 text-3xl font-bold text-[#2864E8]">{{ tasks.length }}</p>
-        </article>
-        <article class="rounded-2xl bg-white p-5 shadow-sm sm:p-7">
-          <p class="text-sm font-medium text-[#888888]">Jawaban masuk</p>
-          <p class="mt-2 text-3xl font-bold text-[#2864E8]">{{ submissions.length }}</p>
-        </article>
-        <article class="rounded-2xl bg-white p-5 shadow-sm sm:p-7">
-          <p class="text-sm font-medium text-[#888888]">Rata-rata nilai</p>
-          <p class="mt-2 text-3xl font-bold text-[#2864E8]">
-            {{ averageScore === null ? '-' : `${averageScore}%` }}
-          </p>
-          <p v-if="averageScore === null" class="mt-1 text-xs text-[#888888]">
-            Belum ada jawaban yang dinilai.
-          </p>
-        </article>
-      </section>
+            <div v-if="isStudent" class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span
+                v-if="!getStudentSubmission(task)"
+                class="text-xs font-semibold text-[#777777] sm:text-sm"
+              >
+                Belum dikerjakan
+              </span>
+              <template
+                v-else-if="
+                  getStudentSubmission(task).graded || getStudentSubmission(task).score != null
+                "
+              >
+                <span class="text-xs font-semibold text-[#16834b] sm:text-sm"
+                  >Sudah dikerjakan</span
+                >
+                <span
+                  v-if="task.showScore !== false"
+                  class="text-xs font-bold text-[#2864E8] sm:text-sm"
+                >
+                  Nilai: {{ getStudentSubmission(task).score }}/{{
+                    getStudentSubmission(task).maxScore
+                  }}
+                </span>
+              </template>
+              <span v-else class="text-xs font-semibold text-[#b36b00] sm:text-sm">
+                Menunggu nilai
+              </span>
+            </div>
+          </article>
+          <div
+            v-if="tasks.length === 0"
+            key="empty-state"
+            class="rounded-2xl bg-white p-6 text-center text-sm text-[#888888] sm:p-8"
+          >
+            Belum ada kuis di kelas ini.
+          </div>
+        </TransitionGroup>
+
+        <section
+          v-else-if="!isStudent && !selectedStatisticStudent"
+          key="student-list"
+          class="rounded-2xl bg-white p-4 shadow-sm sm:p-6"
+          aria-label="Statistik kelas"
+        >
+          <h2
+            class="border-b border-[#d6d6d6] pb-2 text-lg font-semibold text-[#888888] sm:text-xl"
+          >
+            Mahasiswa
+          </h2>
+          <div class="mt-3 space-y-3 sm:space-y-4">
+            <button
+              v-for="student in classStatisticsStudents"
+              :key="student.id"
+              type="button"
+              class="flex w-full min-w-0 cursor-pointer items-center gap-2 rounded-xl border border-[#c9c9c9] p-1.5 text-left shadow-[0_2px_3px_rgba(0,0,0,0.2)] transition hover:border-[#2864E8] hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2864E8] sm:gap-3 sm:p-2"
+              @click="selectedStatisticStudent = student"
+            >
+              <div class="size-14 shrink-0 overflow-hidden rounded-xl sm:size-16">
+                <StudentAvatar />
+              </div>
+              <div class="min-w-0 flex-1">
+                <h3 class="truncate text-sm font-semibold text-[#777777] sm:text-base">
+                  {{ student.name }}
+                </h3>
+                <p class="truncate text-[11px] text-[#888888] sm:text-xs">{{ student.email }}</p>
+              </div>
+              <div
+                class="flex min-w-14 shrink-0 flex-col items-center rounded-lg bg-[#2864E8] px-2 py-1 text-xs font-medium leading-tight text-white shadow-sm sm:min-w-16 sm:py-1.5 sm:text-sm"
+              >
+                <span>Nilai</span>
+                <span>{{ student.average ?? 'Belum' }}</span>
+              </div>
+            </button>
+            <p
+              v-if="classStatisticsStudents.length === 0"
+              class="py-8 text-center text-sm text-[#888888]"
+            >
+              Belum ada data mahasiswa di kelas ini.
+            </p>
+          </div>
+        </section>
+
+        <div v-else key="student-detail" class="space-y-4 sm:space-y-5">
+          <section
+            v-if="!isStudent"
+            class="flex flex-wrap items-center justify-between gap-3 text-white"
+          >
+            <div>
+              <p class="text-xs font-medium text-white/75">Statistik mahasiswa</p>
+              <h2 class="mt-1 text-lg font-bold sm:text-xl">
+                {{ visibleStatisticStudent.name }}
+              </h2>
+              <p class="text-xs text-white/80 sm:text-sm">{{ visibleStatisticStudent.email }}</p>
+            </div>
+            <button
+              type="button"
+              class="flex items-center gap-2 rounded-lg border border-white/60 px-3 py-2 text-sm font-medium text-white transition hover:bg-white/10"
+              @click="selectedStatisticStudent = null"
+            >
+              <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M15 19l-7-7 7-7"
+                />
+              </svg>
+              Kembali ke mahasiswa
+            </button>
+          </section>
+
+          <section class="grid gap-3 sm:grid-cols-2 sm:gap-5" aria-label="Ringkasan nilai">
+            <article class="rounded-xl bg-white px-4 py-6 text-center shadow-sm sm:py-7">
+              <p class="text-lg font-bold text-[#2864E8] sm:text-2xl">
+                TOTAL KUIS: {{ visibleStatisticStudent.completedQuizCount }}
+              </p>
+            </article>
+            <article class="rounded-xl bg-white px-4 py-6 text-center shadow-sm sm:py-7">
+              <p class="text-lg font-bold text-[#2864E8] sm:text-2xl">
+                RATA-RATA: {{ visibleStatisticStudent.average ?? '-' }}
+              </p>
+            </article>
+          </section>
+
+          <section class="rounded-xl bg-white p-4 shadow-sm sm:p-6" aria-label="Nilai per kuis">
+            <div class="overflow-x-auto">
+              <div :style="{ minWidth: statisticChartWidth }">
+                <div class="relative h-[260px] border-b border-l border-[#b9b9b9] sm:h-[320px]">
+                  <div
+                    v-for="tick in [0, 20, 40, 60, 80, 100]"
+                    :key="tick"
+                    class="absolute left-0 right-0 border-t border-dotted border-[#dddddd]"
+                    :style="{ top: `${100 - tick}%` }"
+                  >
+                    <span
+                      class="absolute -left-10 -top-2.5 w-8 text-right text-[10px] text-[#777777]"
+                    >
+                      {{ tick }}
+                    </span>
+                  </div>
+                  <div
+                    class="absolute inset-0 ml-1 flex items-end justify-around gap-3 px-3 sm:gap-5 sm:px-5"
+                  >
+                    <div
+                      v-for="quiz in visibleStatisticStudent.quizScores"
+                      :key="quiz.id"
+                      class="flex h-full min-w-0 flex-1 items-end justify-center"
+                    >
+                      <div
+                        v-if="quiz.score !== null"
+                        class="w-full max-w-[140px] rounded-t-sm bg-[#4f7fea] transition-[height] duration-500"
+                        :style="{ height: getScoreHeight(quiz.score) }"
+                        :title="`${quiz.title}: ${quiz.score}`"
+                      />
+                      <div v-else class="h-0 w-full max-w-[140px]" />
+                    </div>
+                  </div>
+                </div>
+                <div
+                  class="ml-10 grid gap-3 pt-2 text-center text-[10px] text-[#777777] sm:gap-5 sm:text-xs"
+                  :style="{
+                    gridTemplateColumns: `repeat(${Math.max(tasks.length, 1)}, minmax(0, 1fr))`,
+                  }"
+                >
+                  <span
+                    v-for="quiz in visibleStatisticStudent.quizScores"
+                    :key="quiz.id"
+                    class="truncate"
+                  >
+                    {{ quiz.title }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </Transition>
 
       <!-- Floating Action Button (FAB) Tambah Tugas (+) Sesuai Mockup Gambar -->
     </div>
 
     <Teleport to="body">
       <button
-        v-if="!isStudent"
+        v-if="!isStudent && activeClassTab === 'quizzes' && !selectedStatisticStudent"
         type="button"
-        class="fixed bottom-20 right-6 z-30 flex size-14 cursor-pointer items-center justify-center rounded-full bg-white text-[#2864E8] shadow-[0_6px_20px_rgba(0,0,0,0.25)] transition duration-200 hover:scale-105 hover:shadow-[0_8px_25px_rgba(0,0,0,0.3)] active:scale-95 sm:bottom-8 sm:right-10 sm:size-16"
+        class="motion-control fixed bottom-20 right-6 z-30 flex size-14 cursor-pointer items-center justify-center rounded-full bg-white text-[#2864E8] shadow-[0_6px_20px_rgba(0,0,0,0.25)] transition duration-200 hover:scale-105 hover:shadow-[0_8px_25px_rgba(0,0,0,0.3)] active:scale-95 sm:bottom-8 sm:right-10 sm:size-16"
         aria-label="Tambah Tugas"
         @click="handleFabClick"
       >
@@ -280,7 +494,7 @@ function getStudentSubmission(task) {
             <!-- Opsi 1: Buat Soal dengan AI (Rekomendasi Utama) -->
             <button
               type="button"
-              class="group relative flex items-center gap-4 rounded-2xl border-2 border-[#2864E8] bg-blue-50/40 p-4 text-left transition duration-200 hover:bg-[#2864E8] hover:text-white hover:shadow-lg active:scale-[0.98] cursor-pointer"
+              class="motion-control group relative flex items-center gap-4 rounded-2xl border-2 border-[#2864E8] bg-blue-50/40 p-4 text-left transition duration-200 hover:bg-[#2864E8] hover:text-white hover:shadow-lg active:scale-[0.98] cursor-pointer"
               @click="handleChooseAi"
             >
               <!-- Ikon AI Sparkle / Generator -->
@@ -333,7 +547,7 @@ function getStudentSubmission(task) {
             <!-- Opsi 2: Buat Soal Manual -->
             <button
               type="button"
-              class="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left transition duration-200 hover:border-slate-300 hover:bg-slate-50 hover:shadow-md active:scale-[0.98] cursor-pointer"
+              class="motion-control group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left transition duration-200 hover:border-slate-300 hover:bg-slate-50 hover:shadow-md active:scale-[0.98] cursor-pointer"
               @click="handleChooseManual"
             >
               <div
@@ -448,6 +662,47 @@ function getStudentSubmission(task) {
 .modal-fade-enter-from,
 .modal-fade-leave-to {
   opacity: 0;
+}
+
+.quiz-card-enter-active,
+.quiz-card-leave-active,
+.quiz-card-move {
+  transition:
+    opacity 0.35s ease,
+    transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.quiz-card-enter-from,
+.quiz-card-leave-to {
+  opacity: 0;
+  transform: translateY(14px) scale(0.99);
+}
+
+.tab-content-enter-active,
+.tab-content-leave-active {
+  transition:
+    opacity 0.24s ease,
+    transform 0.24s ease;
+}
+
+.tab-content-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.tab-content-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quiz-card-enter-active,
+  .quiz-card-leave-active,
+  .quiz-card-move,
+  .tab-content-enter-active,
+  .tab-content-leave-active {
+    transition: none;
+  }
 }
 
 @keyframes scaleUp {

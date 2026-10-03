@@ -1,7 +1,10 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { classes } from '@/composables/useClasses.js'
+import { defaultStudents } from '@/data/students.js'
 import DashboardLayout from '@/layouts/DashboardLayout.vue'
+import StudentAvatar from '@/components/icons/StudentAvatar.vue'
 import scanBannerImg from '@/assets/images/BennerscanSoal.png'
 
 const route = useRoute()
@@ -19,6 +22,60 @@ watch(
 
 const fileInput = ref(null)
 const selectedFiles = ref([])
+const isSelectionModalOpen = ref(false)
+const selectionStep = ref('class')
+const classSearch = ref('')
+const studentSearch = ref('')
+const classFilter = ref('all')
+const showClassFilter = ref(false)
+const showStudentFilter = ref(false)
+const showOnlySelectedStudents = ref(false)
+const selectedClassId = ref('')
+const selectedStudentIds = ref([])
+const selectedStudents = ref([])
+
+const filteredClasses = computed(() => {
+  const search = classSearch.value.trim().toLocaleLowerCase()
+  return classes.value.filter((classItem) => {
+    const matchesSearch =
+      !search ||
+      [classItem.title, classItem.major, classItem.lecturer]
+        .filter(Boolean)
+        .some((value) => value.toLocaleLowerCase().includes(search))
+    const matchesFilter = classFilter.value === 'all' || classItem.tasks?.length > 0
+    return matchesSearch && matchesFilter
+  })
+})
+
+const selectedClass = computed(
+  () => classes.value.find((classItem) => String(classItem.id) === selectedClassId.value) || null,
+)
+
+const availableStudents = computed(() => {
+  const submissions = (selectedClass.value?.tasks || []).flatMap((task) => task.submissions || [])
+  if (submissions.length === 0) return defaultStudents
+
+  const uniqueStudents = new Map()
+  submissions.forEach((submission) => {
+    const email = submission.email?.trim().toLowerCase()
+    if (email && !uniqueStudents.has(email)) uniqueStudents.set(email, submission)
+  })
+  return [...uniqueStudents.values()]
+})
+
+const filteredStudents = computed(() => {
+  const search = studentSearch.value.trim().toLocaleLowerCase()
+  return availableStudents.value.filter((student) => {
+    const matchesSearch =
+      !search ||
+      [student.name, student.email]
+        .filter(Boolean)
+        .some((value) => value.toLocaleLowerCase().includes(search))
+    const matchesFilter =
+      !showOnlySelectedStudents.value || selectedStudentIds.value.includes(getStudentId(student))
+    return matchesSearch && matchesFilter
+  })
+})
 
 // Scanning animation state
 const scanProgress = ref(0)
@@ -27,6 +84,72 @@ let scanInterval = null
 
 // Modal simpan
 const isSavedModalOpen = ref(false)
+
+function openClassSelection() {
+  if (selectedFiles.value.length === 0) return
+
+  selectionStep.value = 'class'
+  classSearch.value = ''
+  studentSearch.value = ''
+  classFilter.value = 'all'
+  showOnlySelectedStudents.value = false
+  showClassFilter.value = false
+  showStudentFilter.value = false
+  selectedClassId.value = ''
+  selectedStudentIds.value = []
+  isSelectionModalOpen.value = true
+}
+
+function closeSelectionModal() {
+  isSelectionModalOpen.value = false
+}
+
+function continueToStudentSelection() {
+  if (!selectedClassId.value) return
+  selectionStep.value = 'student'
+  studentSearch.value = ''
+  showOnlySelectedStudents.value = false
+}
+
+function togglePickerFilter() {
+  if (selectionStep.value === 'class') {
+    showClassFilter.value = !showClassFilter.value
+    return
+  }
+
+  showStudentFilter.value = !showStudentFilter.value
+}
+
+function setClassFilter(filter) {
+  classFilter.value = filter
+  showClassFilter.value = false
+}
+
+function setStudentFilter(onlySelected) {
+  showOnlySelectedStudents.value = onlySelected
+  showStudentFilter.value = false
+}
+
+function getStudentId(student) {
+  return student.id ?? student.email
+}
+
+function toggleStudentSelection(student) {
+  const studentId = getStudentId(student)
+  selectedStudentIds.value = selectedStudentIds.value.includes(studentId)
+    ? selectedStudentIds.value.filter((id) => id !== studentId)
+    : [...selectedStudentIds.value, studentId]
+}
+
+function beginCorrection() {
+  if (selectedStudentIds.value.length === 0) return
+
+  selectedStudents.value = availableStudents.value.filter((student) =>
+    selectedStudentIds.value.includes(getStudentId(student)),
+  )
+  isSelectionModalOpen.value = false
+  startScanning()
+}
 
 // Data soal hasil scan (frontend mock sesuai tampilan gambar pengguna)
 const scannedQuestions = ref([
@@ -89,15 +212,6 @@ function formatFileSize(bytes) {
 
 // Mulai proses scanning dengan animasi loading
 function startScanning() {
-  if (selectedFiles.value.length === 0) {
-    selectedFiles.value = [
-      {
-        name: 'Lembar_Soal_ICONFEST_1.png',
-        size: 320000,
-      },
-    ]
-  }
-
   currentStep.value = 'scanning'
   scanProgress.value = 0
   scanStatusText.value = 'Membaca dokumen dan foto soal...'
@@ -129,6 +243,10 @@ function startScanning() {
     }
   }, 40)
 }
+
+onUnmounted(() => {
+  if (scanInterval) clearInterval(scanInterval)
+})
 
 // Toggle status centang soal oleh guru
 function toggleQuestionCheck(index) {
@@ -199,7 +317,9 @@ const buttonText = computed(() => {
       />
 
       <!-- Banner halaman scan soal -->
-      <section class="overflow-hidden rounded-[1.5rem] bg-white shadow-sm sm:rounded-[2rem]">
+      <section
+        class="overflow-hidden rounded-[1.5rem] border-4 border-white bg-white shadow-sm sm:rounded-[2rem]"
+      >
         <img
           :src="scanBannerImg"
           alt="Koreksi jawaban lebih mudah menggunakan AI"
@@ -268,7 +388,7 @@ const buttonText = computed(() => {
           <button
             type="button"
             class="cursor-pointer rounded-xl bg-[#2864E8] px-8 py-3.5 text-base font-semibold text-white shadow-md transition duration-200 hover:bg-[#1f52c4] hover:shadow-lg active:scale-[0.98] sm:px-10 sm:py-4 sm:text-lg"
-            @click="selectedFiles.length > 0 ? startScanning() : triggerFileInput()"
+            @click="selectedFiles.length > 0 ? openClassSelection() : triggerFileInput()"
           >
             {{ buttonText }}
           </button>
@@ -364,7 +484,9 @@ const buttonText = computed(() => {
     <!-- ============================================================== -->
     <div v-else-if="currentStep === 'result'" class="space-y-4 sm:space-y-[22px]">
       <!-- Banner hasil koreksi soal -->
-      <section class="overflow-hidden rounded-[1.5rem] bg-white shadow-sm sm:rounded-[2rem]">
+      <section
+        class="overflow-hidden rounded-[1.5rem] border-4 border-white bg-white shadow-sm sm:rounded-[2rem]"
+      >
         <img
           :src="scanBannerImg"
           alt="Koreksi jawaban lebih mudah menggunakan AI"
@@ -456,6 +578,263 @@ const buttonText = computed(() => {
         </button>
       </div>
     </div>
+
+    <Teleport to="body">
+      <Transition name="picker-modal">
+        <div
+          v-if="isSelectionModalOpen"
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 backdrop-blur-sm sm:p-6"
+          @click.self="closeSelectionModal"
+        >
+          <section
+            class="flex max-h-[calc(100dvh-24px)] w-full max-w-[680px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl sm:max-h-[calc(100dvh-48px)]"
+            role="dialog"
+            aria-modal="true"
+            :aria-labelledby="`picker-title-${selectionStep}`"
+          >
+            <header
+              class="relative flex min-h-[76px] shrink-0 items-center justify-center bg-[linear-gradient(105deg,#2864E8_0%,#173C87_100%)] px-14 py-4 text-center text-white sm:min-h-[100px]"
+            >
+              <button
+                v-if="selectionStep === 'student'"
+                type="button"
+                class="absolute left-4 flex size-9 items-center justify-center rounded-full text-white/90 transition hover:bg-white/10 hover:text-white sm:left-6"
+                aria-label="Kembali memilih kelas"
+                @click="selectionStep = 'class'"
+              >
+                <svg class="size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M15 19l-7-7 7-7"
+                  />
+                </svg>
+              </button>
+              <h2 :id="`picker-title-${selectionStep}`" class="text-xl font-bold sm:text-3xl">
+                {{ selectionStep === 'class' ? 'Pilih Kelas' : 'Pilih Mahasiswa' }}
+              </h2>
+              <button
+                type="button"
+                class="absolute right-4 flex size-9 items-center justify-center rounded-full text-white/90 transition hover:bg-white/10 hover:text-white sm:right-6"
+                aria-label="Tutup pemilihan"
+                @click="closeSelectionModal"
+              >
+                <svg class="size-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="1.75"
+                    d="M6 6l12 12M18 6L6 18"
+                  />
+                </svg>
+              </button>
+            </header>
+
+            <div class="flex min-h-0 flex-1 flex-col px-5 pb-5 pt-4 sm:px-7 sm:pb-7 sm:pt-5">
+              <div class="relative flex shrink-0 items-center gap-3">
+                <label class="relative min-w-0 flex-1">
+                  <span class="sr-only"
+                    >Cari {{ selectionStep === 'class' ? 'kelas' : 'mahasiswa' }}</span
+                  >
+                  <svg
+                    class="pointer-events-none absolute left-4 top-1/2 size-6 -translate-y-1/2 text-[#888888]"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <circle cx="10.8" cy="10.8" r="7.3" stroke-width="1.8" />
+                    <path d="m16.2 16.2 4.2 4.2" stroke-width="1.8" stroke-linecap="round" />
+                  </svg>
+                  <input
+                    v-if="selectionStep === 'class'"
+                    v-model="classSearch"
+                    type="search"
+                    placeholder="Cari kelas"
+                    class="h-12 w-full rounded-xl border border-[#888888] bg-white pl-12 pr-3 text-sm outline-none focus:border-[#2864E8] sm:h-[58px] sm:text-base"
+                  />
+                  <input
+                    v-else
+                    v-model="studentSearch"
+                    type="search"
+                    placeholder="Cari mahasiswa"
+                    class="h-12 w-full rounded-xl border border-[#888888] bg-white pl-12 pr-3 text-sm outline-none focus:border-[#2864E8] sm:h-[58px] sm:text-base"
+                  />
+                </label>
+
+                <div class="relative shrink-0">
+                  <button
+                    type="button"
+                    class="flex size-12 items-center justify-center rounded-xl border border-transparent text-[#808080] transition hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-[#2864E8] sm:size-[58px]"
+                    :aria-label="selectionStep === 'class' ? 'Filter kelas' : 'Filter mahasiswa'"
+                    :aria-expanded="selectionStep === 'class' ? showClassFilter : showStudentFilter"
+                    @click="togglePickerFilter"
+                  >
+                    <svg
+                      class="size-7 sm:size-8"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="1.7"
+                        d="M3 5h18l-7 8v5l-4 2v-7L3 5z"
+                      />
+                    </svg>
+                  </button>
+
+                  <div
+                    v-if="selectionStep === 'class' && showClassFilter"
+                    class="absolute right-0 top-full z-10 mt-1 w-44 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg"
+                  >
+                    <button
+                      type="button"
+                      class="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-blue-50"
+                      @click="setClassFilter('all')"
+                    >
+                      Semua kelas
+                    </button>
+                    <button
+                      type="button"
+                      class="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-blue-50"
+                      @click="setClassFilter('has-quizzes')"
+                    >
+                      Kelas dengan kuis
+                    </button>
+                  </div>
+                  <div
+                    v-else-if="selectionStep === 'student' && showStudentFilter"
+                    class="absolute right-0 top-full z-10 mt-1 w-48 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg"
+                  >
+                    <button
+                      type="button"
+                      class="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-blue-50"
+                      @click="setStudentFilter(false)"
+                    >
+                      Semua mahasiswa
+                    </button>
+                    <button
+                      type="button"
+                      class="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-blue-50"
+                      @click="setStudentFilter(true)"
+                    >
+                      Mahasiswa dipilih
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="min-h-0 flex-1 space-y-3 overflow-y-auto py-4 sm:space-y-4">
+                <template v-if="selectionStep === 'class'">
+                  <button
+                    v-for="classItem in filteredClasses"
+                    :key="classItem.id"
+                    type="button"
+                    class="w-full rounded-2xl border px-5 py-4 text-left shadow-[0_2px_4px_rgba(0,0,0,0.2)] transition sm:px-7 sm:py-5"
+                    :class="
+                      selectedClassId === String(classItem.id)
+                        ? 'border-[#2864E8] ring-2 ring-[#2864E8]/20'
+                        : 'border-[#888888] hover:border-[#2864E8]'
+                    "
+                    @click="selectedClassId = String(classItem.id)"
+                  >
+                    <h3
+                      class="truncate border-b border-[#aaaaaa] pb-2 text-lg text-[#808080] sm:text-2xl"
+                    >
+                      {{ classItem.title }}
+                    </h3>
+                    <p class="mt-2 text-sm text-[#808080] sm:text-lg">
+                      {{ classItem.major || classItem.code || 'Kelas' }}
+                    </p>
+                  </button>
+                  <p
+                    v-if="filteredClasses.length === 0"
+                    class="py-8 text-center text-sm text-[#888888]"
+                  >
+                    Kelas tidak ditemukan.
+                  </p>
+                </template>
+
+                <template v-else>
+                  <button
+                    v-for="student in filteredStudents"
+                    :key="getStudentId(student)"
+                    type="button"
+                    class="flex w-full items-center gap-3 rounded-2xl border px-2 py-2 text-left shadow-[0_2px_4px_rgba(0,0,0,0.2)] transition sm:gap-4 sm:px-3"
+                    :class="
+                      selectedStudentIds.includes(getStudentId(student))
+                        ? 'border-[#2864E8] bg-blue-50/50'
+                        : 'border-[#888888] hover:border-[#2864E8]'
+                    "
+                    :aria-pressed="selectedStudentIds.includes(getStudentId(student))"
+                    @click="toggleStudentSelection(student)"
+                  >
+                    <div class="size-[68px] shrink-0 overflow-hidden rounded-xl sm:size-[88px]">
+                      <StudentAvatar />
+                    </div>
+                    <div class="min-w-0 flex-1">
+                      <h3 class="truncate text-base font-semibold text-[#808080] sm:text-xl">
+                        {{ student.name || student.email }}
+                      </h3>
+                      <p class="truncate text-sm text-[#888888] sm:text-base">
+                        {{ student.email }}
+                      </p>
+                    </div>
+                    <span
+                      class="flex size-6 shrink-0 items-center justify-center rounded-full border"
+                      :class="
+                        selectedStudentIds.includes(getStudentId(student))
+                          ? 'border-[#2864E8] bg-[#2864E8] text-white'
+                          : 'border-[#aaaaaa] text-transparent'
+                      "
+                      aria-hidden="true"
+                    >
+                      <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="3"
+                          d="m5 12 4 4L19 6"
+                        />
+                      </svg>
+                    </span>
+                  </button>
+                  <p
+                    v-if="filteredStudents.length === 0"
+                    class="py-8 text-center text-sm text-[#888888]"
+                  >
+                    Mahasiswa tidak ditemukan.
+                  </p>
+                </template>
+              </div>
+
+              <footer class="flex shrink-0 justify-end border-t border-slate-100 pt-4">
+                <button
+                  v-if="selectionStep === 'class'"
+                  type="button"
+                  :disabled="!selectedClassId"
+                  class="min-h-12 w-full rounded-xl bg-[#2864E8] px-8 text-base font-semibold text-white transition hover:bg-[#1f50be] disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-[58px] sm:w-auto sm:min-w-[200px] sm:text-lg"
+                  @click="continueToStudentSelection"
+                >
+                  Selanjutnya
+                </button>
+                <button
+                  v-else
+                  type="button"
+                  :disabled="selectedStudentIds.length === 0"
+                  class="min-h-12 w-full rounded-xl bg-[#2864E8] px-8 text-base font-semibold text-white transition hover:bg-[#1f50be] disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-[58px] sm:w-auto sm:min-w-[200px] sm:text-lg"
+                  @click="beginCorrection"
+                >
+                  Kirim
+                </button>
+              </footer>
+            </div>
+          </section>
+        </div>
+      </Transition>
+    </Teleport>
 
     <!-- ========================================== -->
     <!-- MODAL POPUP: BERHASIL DISIMPAN             -->
@@ -560,5 +939,15 @@ const buttonText = computed(() => {
 
 .scanner-beam {
   animation: scanSweep 1.8s ease-in-out infinite;
+}
+
+.picker-modal-enter-active,
+.picker-modal-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.picker-modal-enter-from,
+.picker-modal-leave-to {
+  opacity: 0;
 }
 </style>

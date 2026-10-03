@@ -73,12 +73,12 @@ function handleItemClick(index) {
 <template>
   <!-- Desktop: Sidebar Kiri dengan Sliding Active Pill & Micro-animations -->
   <nav
-    class="relative hidden flex-col gap-[12px] px-[26px] pt-[30px] lg:flex select-none"
+    class="relative hidden select-none flex-col gap-[12px] px-[14px] pt-[22px] md:flex lg:px-[26px] lg:pt-[30px]"
     aria-label="Menu utama"
   >
     <!-- Sliding Active Pill Background -->
     <div
-      class="pointer-events-none absolute left-[26px] right-[26px] h-[42px] rounded-xl bg-[#2864E8] shadow-[0_4px_14px_rgba(40,100,232,0.35)]"
+      class="pointer-events-none absolute right-[14px] left-[14px] h-[42px] rounded-xl bg-[#2864E8] shadow-[0_4px_14px_rgba(40,100,232,0.35)] lg:right-[26px] lg:left-[26px]"
       :class="
         isAnimated ? 'transition-transform duration-350 ease-[cubic-bezier(0.25,1,0.3,1)]' : ''
       "
@@ -137,7 +137,7 @@ function handleItemClick(index) {
 
   <!-- Mobile / Tablet: Bottom Navigation dengan Sliding Active Indicator -->
   <nav
-    class="fixed inset-x-0 bottom-0 z-30 flex items-stretch justify-around border-t border-[#dddddd] bg-white/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)] lg:hidden select-none"
+    class="fixed inset-x-0 bottom-0 z-30 flex select-none items-stretch justify-around border-t border-[#dddddd] bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden"
     aria-label="Menu utama"
   >
     <!-- Sliding indicator bar di bagian atas bottom nav -->

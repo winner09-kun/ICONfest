@@ -9,7 +9,7 @@ defineProps({
 
 <template>
   <article
-    class="flex min-h-[150px] cursor-pointer flex-col rounded-lg border border-[#888888] bg-white p-3 sm:min-h-[200px] sm:p-5 shadow-[3px_3px_4px_rgba(0,0,0,0.25)] transition hover:-translate-y-0.5 hover:shadow-[4px_5px_8px_rgba(0,0,0,0.3)] lg:min-h-[255px] lg:p-6"
+    class="motion-surface flex min-h-[150px] cursor-pointer flex-col rounded-lg border border-[#888888] bg-white p-3 sm:min-h-[200px] sm:p-5 shadow-[3px_3px_4px_rgba(0,0,0,0.25)] transition hover:-translate-y-0.5 hover:shadow-[4px_5px_8px_rgba(0,0,0,0.3)] lg:min-h-[255px] lg:p-6"
   >
     <h3 class="text-sm font-medium leading-snug text-black sm:text-xl lg:text-2xl">{{ title }}</h3>
     <p class="mt-1 text-xs text-[#808080] sm:text-sm lg:text-[15px]">{{ major }}</p>

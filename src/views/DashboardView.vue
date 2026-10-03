@@ -18,7 +18,35 @@ const router = useRouter()
 const { user } = useAuth()
 const isStudent = computed(() => user.value?.role === 'student')
 const studentClasses = ref(getClassesForStudent(user.value?.email))
-const classList = computed(() => (isStudent.value ? studentClasses.value : classes.value))
+const classList = computed(() =>
+  isStudent.value
+    ? studentClasses.value.length > 0
+      ? studentClasses.value
+      : classes.value
+    : classes.value,
+)
+const upcomingQuizzes = computed(() => {
+  if (!isStudent.value) return []
+
+  const now = Date.now()
+  return classList.value
+    .flatMap((classItem) =>
+      (classItem.tasks || []).map((task) => {
+        const dueAt =
+          task.dueAt ||
+          (task.deadlineDate ? `${task.deadlineDate}T${task.deadlineTime || '23:59'}:00+08:00` : '')
+        return { classItem, task, dueAt, dueTimestamp: dueAt ? new Date(dueAt).getTime() : 0 }
+      }),
+    )
+    .filter(({ task, dueTimestamp }) => {
+      if (!dueTimestamp || dueTimestamp < now) return false
+      const email = user.value?.email?.trim().toLowerCase()
+      return !task.submissions?.some(
+        (submission) => submission.email?.trim().toLowerCase() === email,
+      )
+    })
+    .sort((first, second) => first.dueTimestamp - second.dueTimestamp)
+})
 const isCreateModalOpen = ref(false)
 const isJoinModalOpen = ref(false)
 const joinMessage = ref('')
@@ -69,18 +97,60 @@ function handleJoinClass(code) {
 function handleClassClick(classItem) {
   router.push(`/kelas/${classItem.id}`)
 }
+
+function handleUpcomingQuizClick(reminder) {
+  router.push(`/kelas/${reminder.classItem.id}/tugas/${reminder.task.id}`)
+}
+
+function formatDeadline(timestamp) {
+  return new Date(timestamp).toLocaleDateString('id-ID', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+}
 </script>
 
 <template>
   <DashboardLayout>
     <div class="space-y-4 sm:space-y-[22px]">
       <!-- Banner Gambar Selamat Datang -->
-      <section class="overflow-hidden rounded-[1.5rem] sm:rounded-[2rem] bg-[#0e66f5] shadow-sm">
+      <section
+        class="overflow-hidden rounded-[1.5rem] border-4 border-white sm:rounded-[2rem] bg-[#0e66f5] shadow-sm"
+      >
         <img
           :src="bannerImg"
           alt="Selamat Datang di KeyQuiz - Esai Tepat, Nilai Cepat, Evaluasi Hemat Waktu Tanpa Subjetivitas"
           class="block h-auto w-full select-none"
         />
+      </section>
+
+      <section
+        v-if="isStudent"
+        class="rounded-[1rem] bg-white p-4 sm:rounded-2xl sm:p-5"
+        aria-label="Kuis yang segera tenggat"
+      >
+        <h2 class="border-b border-[#d6d6d6] pb-2 text-base font-medium text-[#808080] sm:text-xl">
+          Harus Dikerjakan Segera
+        </h2>
+        <button
+          v-for="reminder in upcomingQuizzes"
+          :key="`${reminder.classItem.id}-${reminder.task.id}`"
+          type="button"
+          class="motion-control mt-2 flex w-full flex-wrap items-center justify-between gap-2 rounded-xl border border-[#888888] px-4 py-3 text-left transition hover:border-[#2864E8] hover:bg-blue-50/30"
+          @click="handleUpcomingQuizClick(reminder)"
+        >
+          <span class="text-sm font-medium text-[#222222] sm:text-base">
+            {{ reminder.task.title }} : {{ reminder.classItem.title }}
+          </span>
+          <span class="text-xs text-[#777777] sm:text-sm">
+            {{ formatDeadline(reminder.dueTimestamp) }}
+          </span>
+        </button>
+        <p v-if="upcomingQuizzes.length === 0" class="pt-3 text-sm text-[#777777]">
+          Tidak ada kuis dengan tenggat mendatang.
+        </p>
       </section>
 
       <!-- Kelas -->
@@ -89,14 +159,14 @@ function handleClassClick(classItem) {
           <h2 class="text-lg font-normal text-[#777777] sm:text-[22px]">Kelas</h2>
           <button
             type="button"
-            class="cursor-pointer text-base font-medium text-[#2864E8] transition hover:underline sm:text-[22px]"
+            class="motion-control cursor-pointer text-base font-medium text-[#2864E8] transition hover:underline sm:text-[22px]"
             @click="isStudent ? openJoinModal() : openCreateModal()"
           >
             {{ isStudent ? '+ Gabung Kelas' : '+ Tambah Kelas' }}
           </button>
         </div>
 
-        <div class="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-3 lg:gap-[13px]">
+        <div class="motion-stagger grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-3 lg:gap-[13px]">
           <ClassCard
             v-for="c in classList"
             :key="c.id"
